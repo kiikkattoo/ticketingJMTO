@@ -188,12 +188,6 @@ while ($row = mysqli_fetch_assoc($res_cctv)) {
                         </div>
                     <?php endforeach; ?>
                 </div>
-
-                <!-- Placeholder Pesan Sebelum Filter Klik -->
-                <div class="cctv-empty-placeholder" id="cctvPlaceholder">
-                    <i class="fa-solid fa-filter"></i>
-                    <p>Silakan pilih <b>Area</b> & <b>Lokasi</b> lalu klik <b>Filter</b> untuk menampilkan tayangan CCTV.</p>
-                </div>
             </section>
         </main>
     </div>

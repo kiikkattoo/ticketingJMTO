@@ -84,41 +84,43 @@ $d_perangkat = ($q_perangkat) ? mysqli_fetch_assoc($q_perangkat) : [];
 $turnstile_aktif = (int)($d_perangkat['jml_turnstile'] ?? 0);
 $cctv_aktif      = (int)($d_perangkat['jml_cctv'] ?? 0);
 
-// 6. Data Grafik Harian Per Jam (08:00 - 20:00 sesuai tampilan Figma dd/mm HH:00)
-$tgl_label = date('d/m');
-$jam_slots = ['08', '10', '12', '14', '16', '18', '20'];
-$harian_labels = [];
-$harian_traffic = [];
-$harian_pendapatan = [];
-
-foreach ($jam_slots as $j) {
-    $harian_labels[] = [$tgl_label, "$j:00"];
-    $harian_traffic[$j] = 0;
-    $harian_pendapatan[$j] = 0;
-}
+// 6. Data Grafik Harian Per Jam, dibagi 3 shift (Pagi 00-12, Siang 13-18, Malam 19-23)
+$hourly_traffic    = array_fill(0, 24, 0);
+$hourly_pendapatan = array_fill(0, 24, 0);
 
 $q_harian = mysqli_query($conn, "SELECT 
-    LPAD(HOUR(t.waktu_transaksi), 2, '0') AS jam_trx,
+    HOUR(t.waktu_transaksi) AS jam_trx,
     COUNT(t.id_transaksi) AS jml_pengunjung,
     COALESCE(SUM(CASE WHEN t.status_transaksi = 'Berhasil' THEN t.nominal ELSE 0 END), 0) AS omzet
     FROM transaksi t
     INNER JOIN area_lokasi a ON t.id_area = a.id_area
     $sql_where_trx
-    GROUP BY jam_trx");
+    GROUP BY HOUR(t.waktu_transaksi)");
 
 if ($q_harian) {
     while ($rh = mysqli_fetch_assoc($q_harian)) {
         $h = (int)$rh['jam_trx'];
-        // Kelompokkan ke slot 2-jaman terdekat (08, 10, 12, 14, 16, 18, 20)
-        $slot = str_pad((string)(floor($h / 2) * 2), 2, '0', STR_PAD_LEFT);
-        if (isset($harian_traffic[$slot])) {
-            $harian_traffic[$slot] += (int)$rh['jml_pengunjung'];
-            $harian_pendapatan[$slot] += (float)$rh['omzet'];
-        }
+        $hourly_traffic[$h]    = (int)$rh['jml_pengunjung'];
+        $hourly_pendapatan[$h] = (float)$rh['omzet'];
     }
 }
-$harian_traffic = array_values($harian_traffic);
-$harian_pendapatan = array_values($harian_pendapatan);
+
+$tgl_label = date('d/m');
+$shift_ranges = ['pagi' => [0, 12], 'siang' => [13, 18], 'malam' => [19, 23]];
+$shift_data = [];
+foreach ($shift_ranges as $nama_shift => $range) {
+    $lbl = []; $trf = []; $pen = [];
+    for ($i = $range[0]; $i <= $range[1]; $i++) {
+        $lbl[] = [$tgl_label, str_pad($i, 2, '0', STR_PAD_LEFT) . ':00'];
+        $trf[] = $hourly_traffic[$i];
+        $pen[] = $hourly_pendapatan[$i];
+    }
+    $shift_data[$nama_shift] = ['labels' => $lbl, 'traffic' => $trf, 'pendapatan' => $pen];
+}
+
+// Shift default mengikuti jam saat ini
+$jam_now = (int)date('G');
+$default_shift = ($jam_now <= 12) ? 'pagi' : (($jam_now <= 18) ? 'siang' : 'malam');
 
 // 7. Data Grafik Bulanan (6 Bulan Terakhir: Jan, Feb, Mar, dst.)
 $nama_bulan_id = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
@@ -171,71 +173,209 @@ for ($i = 5; $i >= 0; $i--) {
             gap: 10px;
             margin-top: 16px;
         }
-        /* Header Card Grafik Sesuai Figma */
+
+        /* ===== Header chart & tombol toggle (sama dengan dashboard admin) ===== */
         .chart-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding-bottom: 14px;
-            margin-bottom: 14px;
-            border-bottom: 1px solid #eef2f6;
+            margin-bottom: 18px;
             gap: 10px;
             flex-wrap: wrap;
         }
-        .toggle-buttons {
-            display: inline-flex;
-            border: 1px solid #e2e8f0;
-            border-radius: 8px;
-            padding: 3px;
-            background-color: #ffffff;
-            gap: 2px;
-        }
-        .toggle-buttons button {
-            border: none;
-            background-color: transparent;
-            padding: 6px 14px;
-            border-radius: 6px;
-            font-family: 'Poppins', sans-serif;
-            font-size: 11px;
-            font-weight: 600;
-            color: #333333;
-            cursor: pointer;
-            transition: all 0.2s ease;
-        }
-        .toggle-buttons button:hover:not(.active) {
-            background-color: #f4f6f9;
-        }
-        .toggle-buttons button.active {
-            background-color: #004687;
-            color: #ffffff;
-        }
-        .chart-sub-meta {
+
+        .chart-controls-right {
             display: flex;
-            justify-content: space-between;
             align-items: center;
-            margin-bottom: 10px;
-            font-size: 11px;
-            color: #94a3b8;
+            gap: 10px;
+            flex-wrap: wrap;
         }
-        .chart-legend-dot {
+
+        /* Wadah: kapsul putih dengan border tipis, tombol aktif "melayang" di dalamnya */
+        .chart-card .toggle-buttons,
+        .chart-card .shift-toggle-buttons {
             display: inline-flex;
             align-items: center;
-            gap: 6px;
-            color: #64748b;
+            gap: 4px;
+            padding: 4px;
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+        }
+
+        /* Tombol default */
+        .chart-card .toggle-buttons button,
+        .chart-card .shift-toggle-buttons button {
+            border: none;
+            background: transparent;
+            padding: 7px 16px;
+            border-radius: 7px;
+            font-family: 'Poppins', sans-serif;
             font-size: 12px;
             font-weight: 500;
+            color: #475569;
+            cursor: pointer;
+            transition: background-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
         }
-        .chart-legend-dot span {
-            width: 10px;
-            height: 10px;
-            border-radius: 2px;
-            background-color: #F2C94C;
-            display: inline-block;
+
+        /* Hover (tombol yang belum aktif) */
+        .chart-card .toggle-buttons button:hover:not(.active),
+        .chart-card .shift-toggle-buttons button:hover:not(.active) {
+            background: #eef3f9;
+            color: #004b87;
         }
+
+        /* Tombol aktif: biru navy solid, sudut membulat, ada bayangan halus */
+        .chart-card .toggle-buttons button.active,
+        .chart-card .shift-toggle-buttons button.active {
+            background: #004b87;
+            color: #ffffff;
+            font-weight: 600;
+            box-shadow: 0 2px 6px rgba(0, 75, 135, 0.28);
+        }
+
+        /* Aksesibilitas keyboard */
+        .chart-card .toggle-buttons button:focus-visible,
+        .chart-card .shift-toggle-buttons button:focus-visible {
+            outline: 2px solid #8ab4dc;
+            outline-offset: 1px;
+        }
+
         @media (max-width: 992px) {
             .filter-grid-3 {
                 grid-template-columns: 1fr;
             }
+        }
+
+        /* ===== Kartu statistik (KPI) - tata letak 3 kolom, gaya sesuai desain ===== */
+        .stats-grid {
+            display: grid !important;
+            grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+            gap: 22px !important;
+            margin-bottom: 24px;
+        }
+        .stats-grid .stat-card {
+            display: flex !important;
+            flex-direction: row !important;
+            align-items: center !important;
+            justify-content: flex-start !important;
+            gap: 14px !important;
+            min-height: 142px !important;
+            height: auto !important;
+            padding: 22px 26px !important;
+            background: #004080 !important;
+            border-radius: 16px !important;
+            color: #ffffff !important;
+            text-decoration: none !important;
+            box-shadow: 0 6px 14px rgba(0, 64, 128, 0.22) !important;
+            box-sizing: border-box;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        .stats-grid a.stat-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 22px rgba(0, 64, 128, 0.32) !important;
+        }
+
+        /* Ikon: putih solid, langsung di kartu (tanpa kotak), di kolom kiri */
+        .stats-grid .stat-card .card-icon {
+            flex: 0 0 36% !important;
+            max-width: 36%;
+            width: auto !important;
+            height: auto !important;
+            min-width: 0 !important;
+            display: flex !important;
+            align-items: center;
+            justify-content: center;
+            background: transparent !important;
+            border-radius: 0 !important;
+            color: #ffffff !important;
+            padding: 0;
+            margin: 0;
+        }
+        .stats-grid .stat-card .card-icon svg {
+            width: 58px;
+            height: 58px;
+            display: block;
+        }
+
+        /* Teks di kolom kanan */
+        .stats-grid .stat-card .card-info {
+            display: flex !important;
+            flex-direction: column;
+            justify-content: center;
+            gap: 4px;
+            flex: 1 1 auto;
+            min-width: 0;
+            padding: 0;
+            margin: 0;
+        }
+        .stats-grid .stat-card .card-label {
+            font-size: 13px !important;
+            font-weight: 600 !important;
+            color: #ffffff !important;
+            line-height: 1.3;
+            margin: 0 !important;
+        }
+        .stats-grid .stat-card .card-value {
+            font-size: clamp(22px, 1.7vw, 32px) !important;
+            font-weight: 700 !important;
+            color: #ffffff !important;
+            line-height: 1.15;
+            margin: 0 !important;
+            white-space: nowrap;
+        }
+        .stats-grid .stat-card .card-trend {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 11px !important;
+            font-weight: 400;
+            color: #d3deec !important;
+            margin-top: 4px;
+        }
+
+        /* Perangkat aktif: ikon bulat putih + teks kecil, seperti desain */
+        .stats-grid .stat-card .device-sub-badges {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 8px 14px;
+            margin-top: 6px;
+        }
+        .stats-grid .stat-card .device-sub-badges span {
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            font-size: 11px;
+            font-weight: 500;
+            color: #e3ebf5;
+            background: transparent;
+            padding: 0;
+            white-space: nowrap;
+        }
+        .stats-grid .stat-card .device-sub-badges .dev-ic {
+            width: 26px;
+            height: 26px;
+            border-radius: 50%;
+            background: #ffffff;
+            color: #004080;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+        .stats-grid .stat-card .device-sub-badges .dev-ic svg {
+            width: 16px;
+            height: 16px;
+            display: block;
+        }
+
+        @media (max-width: 992px) {
+            .stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+        }
+        @media (max-width: 600px) {
+            .stats-grid { grid-template-columns: 1fr !important; }
+            .stats-grid .stat-card .card-icon { flex: 0 0 90px !important; max-width: 90px; }
         }
     </style>
 </head>
@@ -340,7 +480,7 @@ for ($i = 5; $i >= 0; $i--) {
         <!-- 5 Kartu KPI -->
         <section class="stats-grid">
             <div class="stat-card">
-                <div class="card-icon"><i class="fa-solid fa-ticket"></i></div>
+                <div class="card-icon"><svg viewBox="0 0 48 48" fill="currentColor" aria-hidden="true"><g transform="rotate(-20 24 24)"><mask id="mTicket" maskUnits="userSpaceOnUse" x="-20" y="-20" width="90" height="90"><rect x="-20" y="-20" width="90" height="90" fill="#fff"/><circle cx="3" cy="24" r="3.8" fill="#000"/><circle cx="45" cy="24" r="3.8" fill="#000"/><rect x="15" y="17.2" width="18" height="3" rx="1.2" fill="#000"/><rect x="15" y="22.5" width="18" height="3" rx="1.2" fill="#000"/><rect x="15" y="27.8" width="18" height="3" rx="1.2" fill="#000"/></mask><rect x="3" y="12" width="42" height="24" rx="5.5" mask="url(#mTicket)"/></g></svg></div>
                 <div class="card-info">
                     <span class="card-label">Total Transaksi</span>
                     <h2 class="card-value"><?= number_format($total_transaksi, 0, ',', '.'); ?></h2>
@@ -349,7 +489,7 @@ for ($i = 5; $i >= 0; $i--) {
             </div>
 
             <div class="stat-card">
-                <div class="card-icon"><i class="fa-solid fa-torii-gate"></i></div>
+                <div class="card-icon"><svg viewBox="0 0 48 48" fill="currentColor" aria-hidden="true"><g transform="rotate(-8 24 18)"><mask id="mGate" maskUnits="userSpaceOnUse" x="-20" y="-20" width="90" height="90"><rect x="-20" y="-20" width="90" height="90" fill="#fff"/><rect x="9" y="9.5" width="26" height="9" rx="1.6" fill="#000"/></mask><rect x="4" y="5" width="36" height="22" rx="3.6" mask="url(#mGate)"/><rect x="15" y="12" width="14" height="13" rx="1.3"/></g><path d="M24 45V33.5M19 38.5l5-5 5 5" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
                 <div class="card-info">
                     <span class="card-label">Gate Aktif</span>
                     <h2 class="card-value"><?= $gate_aktif; ?></h2>
@@ -357,7 +497,7 @@ for ($i = 5; $i >= 0; $i--) {
             </div>
 
             <div class="stat-card">
-                <div class="card-icon"><i class="fa-solid fa-location-dot"></i></div>
+                <div class="card-icon"><svg viewBox="0 0 48 48" fill="currentColor" aria-hidden="true"><mask id="mPin" maskUnits="userSpaceOnUse" x="-20" y="-20" width="90" height="90"><rect x="-20" y="-20" width="90" height="90" fill="#fff"/><circle cx="24" cy="16.5" r="5.4" fill="#000"/></mask><path d="M24 3C16.3 3 10 9.2 10 16.8 10 26.8 24 38 24 38S38 26.8 38 16.8C38 9.2 31.7 3 24 3Z" mask="url(#mPin)"/><ellipse cx="24" cy="38" rx="18.5" ry="5.4" fill="none" stroke="currentColor" stroke-width="2"/></svg></div>
                 <div class="card-info">
                     <span class="card-label">Area</span>
                     <h2 class="card-value"><?= $jml_area; ?></h2>
@@ -365,18 +505,18 @@ for ($i = 5; $i >= 0; $i--) {
             </div>
 
             <div class="stat-card">
-                <div class="card-icon"><i class="fa-solid fa-video"></i></div>
+                <div class="card-icon"><svg viewBox="0 0 48 48" fill="currentColor" aria-hidden="true"><mask id="mProj" maskUnits="userSpaceOnUse" x="-20" y="-20" width="90" height="90"><rect x="-20" y="-20" width="90" height="90" fill="#fff"/><circle cx="28" cy="22.5" r="7.2" fill="#000"/><circle cx="11" cy="22.5" r="1.9" fill="#000"/></mask><rect x="3" y="11" width="42" height="23" rx="6.5" mask="url(#mProj)"/><circle cx="28" cy="22.5" r="3.5"/><rect x="22" y="36" width="12" height="3.2" rx="1.6"/></svg></div>
                 <div class="card-info">
                     <span class="card-label">Perangkat Aktif</span>
-                    <div class="device-badges">
-                        <span class="badge"><i class="fa-solid fa-door-open"></i> <?= $turnstile_aktif; ?> Turnstile</span>
-                        <span class="badge"><i class="fa-solid fa-camera"></i> <?= $cctv_aktif; ?> CCTV</span>
+                    <div class="device-sub-badges">
+                        <span><i class="dev-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="7" width="6" height="14" rx="1.5"/><circle cx="9" cy="10.5" r="1"/><line x1="10" y1="10.5" x2="21" y2="10.5"/><line x1="9.8" y1="11.3" x2="17" y2="18"/><line x1="8.6" y1="11.6" x2="12" y2="20"/></svg></i> <?= $turnstile_aktif; ?> Turnstile</span>
+                        <span><i class="dev-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 8.5l12-3.5 2.2 6.3-12 3.5z"/><path d="M16 8l4.5-1.2v4.6L17.6 12"/><path d="M7.5 15.3V20H13"/></svg></i> <?= $cctv_aktif; ?> CCTV</span>
                     </div>
                 </div>
             </div>
 
             <div class="stat-card">
-                <div class="card-icon"><i class="fa-solid fa-money-bill-trend-up"></i></div>
+                <div class="card-icon"><svg viewBox="0 0 48 48" fill="currentColor" aria-hidden="true"><path d="M5 20L15 10l7 6L34 5" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M26 4.6h8.4V13" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/><g transform="rotate(-8 24 35)"><mask id="mMoney" maskUnits="userSpaceOnUse" x="-20" y="-20" width="90" height="90"><rect x="-20" y="-20" width="90" height="90" fill="#fff"/><circle cx="24" cy="35" r="6.4" fill="#000"/><circle cx="10.5" cy="35" r="1.9" fill="#000"/><circle cx="37.5" cy="35" r="1.9" fill="#000"/></mask><rect x="4" y="26" width="40" height="18" rx="3.2" mask="url(#mMoney)"/><circle cx="24" cy="35" r="3.1"/></g></svg></div>
                 <div class="card-info">
                     <span class="card-label">Pendapatan</span>
                     <h2 class="card-value">Rp <?= number_format($total_pendapatan, 0, ',', '.'); ?></h2>
@@ -385,46 +525,56 @@ for ($i = 5; $i >= 0; $i--) {
             </div>
         </section>
 
-        <!-- Grafik Traffic & Pendapatan Sesuai Figma -->
+        <!-- Grafik Traffic & Pendapatan -->
         <section class="charts-grid">
             <!-- Grafik Kiri: Traffic (Bar Chart Kuning) -->
             <div class="chart-card">
                 <div class="chart-header">
                     <div class="chart-title-group">
-                        <span class="chart-title-icon"><i class="fa-solid fa-right-left"></i></span>
+                        <span class="chart-title-icon"><i class="fa-solid fa-arrow-right-arrow-left"></i></span>
                         <h3 class="chart-title">Traffic</h3>
                     </div>
-                    <div class="toggle-buttons">
-                        <button type="button" id="btnTrafficHarian" class="active" onclick="switchTraffic('harian')">Harian</button>
-                        <button type="button" id="btnTrafficBulanan" onclick="switchTraffic('bulanan')">Bulanan</button>
+                    <div class="chart-controls-right">
+                        <!-- Sub-filter Pagi / Siang / Malam (tampil saat mode Harian) -->
+                        <div class="shift-toggle-buttons" id="trafficShiftGroup">
+                            <button type="button" class="<?= $default_shift === 'pagi' ? 'active' : ''; ?>" onclick="switchTrafficShift('pagi', this)">Pagi</button>
+                            <button type="button" class="<?= $default_shift === 'siang' ? 'active' : ''; ?>" onclick="switchTrafficShift('siang', this)">Siang</button>
+                            <button type="button" class="<?= $default_shift === 'malam' ? 'active' : ''; ?>" onclick="switchTrafficShift('malam', this)">Malam</button>
+                        </div>
+                        <!-- Toggle Harian / Bulanan -->
+                        <div class="toggle-buttons">
+                            <button type="button" id="btnTrafficHarian" class="active" onclick="switchTraffic('harian')">Harian</button>
+                            <button type="button" id="btnTrafficBulanan" onclick="switchTraffic('bulanan')">Bulanan</button>
+                        </div>
                     </div>
                 </div>
-                <div class="chart-sub-meta">
-                    <span>Jumlah Pengunjung</span>
-                    <div class="chart-legend-dot"><span></span> Pengunjung</div>
-                </div>
-                <div class="chart-canvas-wrapper" style="height: 250px;">
+                <div class="chart-canvas-wrapper" style="height: 290px;">
                     <canvas id="trafficChart"></canvas>
                 </div>
             </div>
 
-            <!-- Grafik Kanan: Pendapatan (Line Chart Kuning Emas) -->
+            <!-- Grafik Kanan: Pendapatan (Line Chart Kuning) -->
             <div class="chart-card">
                 <div class="chart-header">
                     <div class="chart-title-group">
                         <span class="chart-title-icon"><i class="fa-solid fa-chart-line"></i></span>
                         <h3 class="chart-title">Pendapatan</h3>
                     </div>
-                    <div class="toggle-buttons">
-                        <button type="button" id="btnOmzetHarian" class="active" onclick="switchOmzet('harian')">Harian</button>
-                        <button type="button" id="btnOmzetBulanan" onclick="switchOmzet('bulanan')">Bulanan</button>
+                    <div class="chart-controls-right">
+                        <!-- Sub-filter Pagi / Siang / Malam (tampil saat mode Harian) -->
+                        <div class="shift-toggle-buttons" id="omzetShiftGroup">
+                            <button type="button" class="<?= $default_shift === 'pagi' ? 'active' : ''; ?>" onclick="switchOmzetShift('pagi', this)">Pagi</button>
+                            <button type="button" class="<?= $default_shift === 'siang' ? 'active' : ''; ?>" onclick="switchOmzetShift('siang', this)">Siang</button>
+                            <button type="button" class="<?= $default_shift === 'malam' ? 'active' : ''; ?>" onclick="switchOmzetShift('malam', this)">Malam</button>
+                        </div>
+                        <!-- Toggle Harian / Bulanan -->
+                        <div class="toggle-buttons">
+                            <button type="button" id="btnOmzetHarian" class="active" onclick="switchOmzet('harian')">Harian</button>
+                            <button type="button" id="btnOmzetBulanan" onclick="switchOmzet('bulanan')">Bulanan</button>
+                        </div>
                     </div>
                 </div>
-                <div class="chart-sub-meta">
-                    <span>Pendapatan (Rp)</span>
-                    <div class="chart-legend-dot"><span></span> Pendapatan</div>
-                </div>
-                <div class="chart-canvas-wrapper" style="height: 250px;">
+                <div class="chart-canvas-wrapper" style="height: 290px;">
                     <canvas id="pendapatanChart"></canvas>
                 </div>
             </div>
@@ -441,128 +591,251 @@ for ($i = 5; $i >= 0; $i--) {
         currentGroup.classList.toggle('active');
     }
 
-    const harianLabels = <?= json_encode($harian_labels); ?>;
-    const harianTraffic = <?= json_encode($harian_traffic); ?>;
-    const harianOmzet = <?= json_encode($harian_pendapatan); ?>;
+    const shiftDatasets = <?= json_encode($shift_data); ?>;
+    let trafficMode = 'harian';
+    let omzetMode = 'harian';
+    let trafficShift = '<?= $default_shift; ?>';
+    let omzetShift = '<?= $default_shift; ?>';
 
     const bulananLabels = <?= json_encode($bulanan_labels); ?>;
     const bulananTraffic = <?= json_encode($bulanan_traffic); ?>;
     const bulananOmzet = <?= json_encode($bulanan_pendapatan); ?>;
 
-    // 1. Bar Chart Traffic (Kuning Sesuai Figma)
+    // ===== Judul tooltip: "dd/mm/yyyy (08:00 - 08:59)" untuk harian, nama bulan untuk bulanan =====
+    function formatHourlyTooltipTitle(context) {
+        const rawLabel = context[0].chart.data.labels[context[0].dataIndex];
+        if (Array.isArray(rawLabel) && rawLabel.length === 2) {
+            const tanggal = rawLabel[0].length === 5 ? rawLabel[0] + '/<?= date("Y"); ?>' : rawLabel[0];
+            const jamMulai = rawLabel[1];
+            const jamAngka = jamMulai.split(':')[0];
+            return `${tanggal} (${jamMulai} - ${jamAngka}:59)`;
+        }
+        return rawLabel;
+    }
+
+    // ===== Gaya chart interaktif (sama dengan dashboard admin) =====
+    const COLOR_BAR        = '#FFE580';   // kuning muda (normal)
+    const COLOR_BAR_HOVER  = '#F2C400';   // kuning solid (saat di-hover)
+    const COLOR_LINE       = '#F7D95A';
+    const COLOR_LINE_DARK  = '#C99A00';
+
+    Chart.defaults.font.family = "'Poppins', sans-serif";
+    Chart.defaults.color = '#6b7280';
+
+    // Latar abu-abu muda di area plot
+    const plotAreaBg = {
+        id: 'plotAreaBg',
+        beforeDraw(chart) {
+            const { ctx, chartArea } = chart;
+            if (!chartArea) return;
+            ctx.save();
+            ctx.fillStyle = '#f8fafc';
+            ctx.fillRect(chartArea.left, chartArea.top,
+                         chartArea.right - chartArea.left,
+                         chartArea.bottom - chartArea.top);
+            ctx.restore();
+        }
+    };
+
+    function makeXScale(titleText) {
+        return {
+            grid: { display: false },
+            border: { display: false },
+            ticks: { maxRotation: 0, minRotation: 0, autoSkip: false, font: { size: 11 } },
+            title: { display: true, text: titleText, color: '#111827',
+                     font: { size: 11, weight: '600' }, padding: { top: 10 } }
+        };
+    }
+
+    const tooltipStyle = {
+        backgroundColor: '#004b87',
+        padding: 12,
+        cornerRadius: 10,
+        displayColors: false,
+        titleFont: { size: 12, weight: '600' },
+        bodyFont: { size: 12 }
+    };
+
+    const legendStyle = {
+        position: 'top',
+        align: 'end',
+        labels: { usePointStyle: true, pointStyle: 'rect', boxWidth: 10, boxHeight: 10 }
+    };
+
+    const hoverCursor = (evt, els) => {
+        evt.native.target.style.cursor = els.length ? 'pointer' : 'default';
+    };
+
+    // ---------- 1. TRAFFIC (BAR) ----------
     const trafficChart = new Chart(document.getElementById('trafficChart').getContext('2d'), {
         type: 'bar',
         data: {
-            labels: harianLabels,
+            labels: shiftDatasets[trafficShift].labels,
             datasets: [{
                 label: 'Pengunjung',
-                data: harianTraffic,
-                backgroundColor: '#FDE047',
-                hoverBackgroundColor: '#EAB308',
-                borderRadius: 4,
-                barThickness: 22
+                data: shiftDatasets[trafficShift].traffic,
+                backgroundColor: COLOR_BAR,
+                hoverBackgroundColor: COLOR_BAR_HOVER,
+                borderRadius: { topLeft: 6, topRight: 6 },
+                borderSkipped: false,
+                maxBarThickness: 30
             }]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
+            animation: { duration: 700, easing: 'easeOutQuart' },
+            interaction: { mode: 'index', intersect: false },
+            onHover: hoverCursor,
             plugins: {
-                legend: { display: false },
+                legend: legendStyle,
                 tooltip: {
+                    ...tooltipStyle,
                     callbacks: {
-                        label: function(ctx) {
-                            return ` Pengunjung: ${ctx.parsed.y.toLocaleString('id-ID')} tiket`;
-                        }
+                        title: formatHourlyTooltipTitle,
+                        label: ctx => `Total Pengunjung: ${ctx.parsed.y.toLocaleString('id-ID')} orang`
                     }
                 }
             },
             scales: {
-                x: {
-                    grid: { display: false },
-                    ticks: { font: { size: 10 }, color: '#64748b' },
-                    title: {
-                        display: true,
-                        text: 'Tanggal & Jam',
-                        font: { size: 11, weight: '600' },
-                        color: '#334155'
-                    }
-                },
+                x: makeXScale('Tanggal & Jam'),
                 y: {
                     beginAtZero: true,
-                    grid: { color: '#f1f5f9' },
-                    ticks: { precision: 0, font: { size: 10 }, color: '#64748b' }
+                    border: { display: false },
+                    grid: { color: '#e5e7eb' },
+                    ticks: { precision: 0 }
                 }
             }
-        }
+        },
+        plugins: [plotAreaBg]
     });
 
-    // 2. Line Chart Pendapatan (Garis Kuning Emas Sesuai Figma)
+    // ---------- 2. PENDAPATAN (LINE) ----------
     const pendapatanChart = new Chart(document.getElementById('pendapatanChart').getContext('2d'), {
         type: 'line',
         data: {
-            labels: harianLabels,
+            labels: shiftDatasets[omzetShift].labels,
             datasets: [{
                 label: 'Pendapatan',
-                data: harianOmzet,
-                borderColor: '#FACC15',
-                backgroundColor: '#FACC15',
-                pointBackgroundColor: '#EAB308',
-                pointBorderColor: '#EAB308',
-                pointRadius: 4,
-                pointHoverRadius: 6,
-                borderWidth: 2.5,
-                fill: false,
-                tension: 0
+                data: shiftDatasets[omzetShift].pendapatan,
+                borderColor: COLOR_LINE,
+                borderWidth: 3,
+                tension: 0.35,
+                fill: true,
+                backgroundColor: function (context) {
+                    const { ctx, chartArea } = context.chart;
+                    if (!chartArea) return 'rgba(247,217,90,0.2)';
+                    const g = ctx.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
+                    g.addColorStop(0, 'rgba(247,217,90,0.45)');
+                    g.addColorStop(1, 'rgba(247,217,90,0.02)');
+                    return g;
+                },
+                pointBackgroundColor: COLOR_LINE,
+                pointBorderColor: '#ffffff',
+                pointBorderWidth: 2,
+                pointRadius: 5,
+                pointHoverRadius: 8,
+                pointHoverBackgroundColor: COLOR_LINE_DARK,
+                pointHoverBorderColor: '#ffffff',
+                pointHoverBorderWidth: 3
             }]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
+            animation: { duration: 800, easing: 'easeOutQuart' },
+            interaction: { mode: 'index', intersect: false },
+            onHover: hoverCursor,
             plugins: {
-                legend: { display: false },
+                legend: legendStyle,
                 tooltip: {
+                    ...tooltipStyle,
                     callbacks: {
-                        label: function(ctx) {
-                            return ` Pendapatan: Rp ${ctx.parsed.y.toLocaleString('id-ID')}`;
-                        }
+                        title: formatHourlyTooltipTitle,
+                        label: ctx => `Total Pendapatan: Rp ${ctx.parsed.y.toLocaleString('id-ID')}`
                     }
                 }
             },
             scales: {
-                x: {
-                    grid: { display: false },
-                    ticks: { font: { size: 11 }, color: '#64748b' }
-                },
+                x: makeXScale('Tanggal & Jam'),
                 y: {
                     beginAtZero: true,
-                    grid: { color: '#f1f5f9' },
+                    border: { display: false },
+                    grid: { color: '#e5e7eb' },
                     ticks: {
-                        font: { size: 10 },
-                        color: '#64748b',
-                        callback: function(value) {
-                            return 'Rp ' + value.toLocaleString('id-ID');
-                        }
+                        callback: v => v >= 1000000 ? (v / 1000000).toLocaleString('id-ID') + ' jt'
+                                     : v >= 1000    ? (v / 1000).toLocaleString('id-ID') + ' rb'
+                                     : v
                     }
                 }
             }
-        }
+        },
+        plugins: [plotAreaBg]
     });
 
-    function switchTraffic(mode) {
-        document.getElementById('btnTrafficHarian').classList.toggle('active', mode === 'harian');
-        document.getElementById('btnTrafficBulanan').classList.toggle('active', mode === 'bulanan');
-        trafficChart.data.labels = (mode === 'harian') ? harianLabels : bulananLabels;
-        trafficChart.data.datasets[0].data = (mode === 'harian') ? harianTraffic : bulananTraffic;
-        trafficChart.options.scales.x.title.text = (mode === 'harian') ? 'Tanggal & Jam' : 'Bulan';
+    // ---------- Render ulang chart sesuai mode (Harian/Bulanan) & shift ----------
+    function renderTraffic() {
+        const group = document.getElementById('trafficShiftGroup');
+        if (trafficMode === 'harian') {
+            group.style.display = 'inline-flex';
+            trafficChart.data.labels = shiftDatasets[trafficShift].labels;
+            trafficChart.data.datasets[0].data = shiftDatasets[trafficShift].traffic;
+            trafficChart.options.scales.x.title.text = 'Tanggal & Jam';
+            trafficChart.options.scales.x.ticks.font.size = (trafficShift === 'pagi') ? 9.5 : 11;
+        } else {
+            group.style.display = 'none';
+            trafficChart.data.labels = bulananLabels;
+            trafficChart.data.datasets[0].data = bulananTraffic;
+            trafficChart.options.scales.x.title.text = 'Bulan';
+            trafficChart.options.scales.x.ticks.font.size = 11;
+        }
         trafficChart.update();
     }
 
+    function renderOmzet() {
+        const group = document.getElementById('omzetShiftGroup');
+        if (omzetMode === 'harian') {
+            group.style.display = 'inline-flex';
+            pendapatanChart.data.labels = shiftDatasets[omzetShift].labels;
+            pendapatanChart.data.datasets[0].data = shiftDatasets[omzetShift].pendapatan;
+            pendapatanChart.options.scales.x.title.text = 'Tanggal & Jam';
+            pendapatanChart.options.scales.x.ticks.font.size = (omzetShift === 'pagi') ? 9.5 : 11;
+        } else {
+            group.style.display = 'none';
+            pendapatanChart.data.labels = bulananLabels;
+            pendapatanChart.data.datasets[0].data = bulananOmzet;
+            pendapatanChart.options.scales.x.title.text = 'Bulan';
+            pendapatanChart.options.scales.x.ticks.font.size = 11;
+        }
+        pendapatanChart.update();
+    }
+
+    function switchTraffic(mode) {
+        trafficMode = mode;
+        document.getElementById('btnTrafficHarian').classList.toggle('active', mode === 'harian');
+        document.getElementById('btnTrafficBulanan').classList.toggle('active', mode === 'bulanan');
+        renderTraffic();
+    }
+
     function switchOmzet(mode) {
+        omzetMode = mode;
         document.getElementById('btnOmzetHarian').classList.toggle('active', mode === 'harian');
         document.getElementById('btnOmzetBulanan').classList.toggle('active', mode === 'bulanan');
-        pendapatanChart.data.labels = (mode === 'harian') ? harianLabels : bulananLabels;
-        pendapatanChart.data.datasets[0].data = (mode === 'harian') ? harianOmzet : bulananOmzet;
-        pendapatanChart.update();
+        renderOmzet();
+    }
+
+    function switchTrafficShift(shift, btn) {
+        trafficShift = shift;
+        btn.parentElement.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        renderTraffic();
+    }
+
+    function switchOmzetShift(shift, btn) {
+        omzetShift = shift;
+        btn.parentElement.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        renderOmzet();
     }
 </script>
 </body>

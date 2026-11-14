@@ -20,7 +20,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     $tipe_pilihan     = mysqli_real_escape_string($conn, $_POST['tipe_tiket']);
     $nominal_pilihan  = intval($_POST['nominal']);
 
-    $penerbit_pool = ['Bank DKI', 'GOERS', 'APPSKU', 'Petugas'];
+    $penerbit_pool = ['Bank BCA', 'GOERS', 'APPSKU', 'Petugas'];
     $foto_sample   = "https://images.unsplash.com/photo-1517841905240-472988babdf9?w=300&auto=format&fit=crop&q=60";
 
     $sukses = 0;
@@ -222,7 +222,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                 <label>Penerbit / Channel Pembayaran</label>
                 <select name="penerbit" required>
                     <option value="APPSKU">APPSKU</option>
-                    <option value="Bank DKI">Bank DKI</option>
+                    <option value="Bank BCA">Bank BCA</option>
                     <option value="GOERS">GOERS</option>
                     <option value="Petugas">Petugas</option>
                 </select>

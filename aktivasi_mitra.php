@@ -1,4 +1,5 @@
 <?php
+session_start();
 require 'koneksi.php';
 
 $token = $_GET['token'] ?? '';
@@ -11,7 +12,6 @@ if (empty($token)) {
 } else {
     $safe_token = mysqli_real_escape_string($conn, $token);
     $q = mysqli_query($conn, "SELECT * FROM users WHERE activation_token = '$safe_token' AND token_expires > NOW() LIMIT 1");
-    
     if ($q && mysqli_num_rows($q) > 0) {
         $user_data = mysqli_fetch_assoc($q);
     } else {
@@ -33,11 +33,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $user_data) {
 
         // 1. Eksekusi query update ke tabel users
         $update = mysqli_query($conn, "UPDATE users SET 
-            password = '$hashed', 
-            status_user = 'Active', 
-            activation_token = NULL, 
-            token_expires = NULL 
-            WHERE id = $uid");
+                    password = '$hashed', 
+                    status_user = 'Active', 
+                    activation_token = NULL, 
+                    token_expires = NULL 
+                  WHERE id = $uid");
 
         if ($update) {
             // Ambil id_mitra yang terhubung
@@ -46,8 +46,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $user_data) {
             // 2. Sinkronkan status di tabel mitra menggunakan kode_mitra
             mysqli_query($conn, "UPDATE mitra SET status_mitra = 'Aktif' WHERE kode_mitra = '$id_mitra_user'");
 
-            $success = "Akun Mitra berhasil diaktifkan! Silakan Login menggunakan email dan password baru Anda.";
-            $user_data = null; 
+            // SET SESSION LOGIN OTOMATIS
+            $_SESSION["loggedin"] = true;
+            $_SESSION["kode_user"] = $user_data['kode_user'];
+            $_SESSION["nama_user"] = $user_data['nama_user'];
+            $_SESSION["nama_role"] = 'mitra'; // Sesuaikan dengan role di database
+
+            // REDIRECT OTOMATIS KE DASHBOARD MITRA
+            header("Location: mitra/dashboard.php");
+            exit();
         } else {
             $error = "Terjadi kesalahan sistem saat menyimpan password: " . mysqli_error($conn);
         }
@@ -135,7 +142,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $user_data) {
             transition: background 0.2s;
         }
         button:hover {
-            background: #003566;
+            background: #003366;
         }
         .alert-err {
             background: #fee2e2;
@@ -156,36 +163,36 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $user_data) {
     </style>
 </head>
 <body>
-    <div class="card">
-        <img src="img/jasamarga-logo.png" alt="Logo Jasamarga" class="logo">
-        <h2>Aktivasi Akun Mitra</h2>
+<div class="card">
+    <img src="img/jasamarga-logo.png" alt="Logo Jasamarga" class="logo">
+    <h2>Aktivasi Akun Mitra</h2>
 
-        <?php if (!empty($error)): ?>
-            <div class="alert-err"><?= htmlspecialchars($error); ?></div>
-        <?php endif; ?>
+    <?php if (!empty($error)): ?>
+        <div class="alert-err"><?= htmlspecialchars($error); ?></div>
+    <?php endif; ?>
 
-        <?php if (!empty($success)): ?>
-            <div class="alert-ok"><?= htmlspecialchars($success); ?></div>
-            <a href="login.php" style="text-decoration: none;">
-                <button type="button">Lanjut ke Halaman Login</button>
-            </a>
-        <?php elseif ($user_data): ?>
-            <p>
-                Halo <b><?= htmlspecialchars($user_data['nama_user']); ?></b> (<?= htmlspecialchars($user_data['email']); ?>),<br>
-                Silakan buat password baru untuk menyetujui undangan dan mengaktifkan akun Portal Mitra Anda.
-            </p>
-            <form method="POST">
-                <div class="form-group">
-                    <label>Password Baru</label>
-                    <input type="password" name="password" placeholder="Minimal 6 karakter" required>
-                </div>
-                <div class="form-group">
-                    <label>Konfirmasi Password Baru</label>
-                    <input type="password" name="confirm_password" placeholder="Ulangi password baru" required>
-                </div>
-                <button type="submit">Setujui & Aktifkan Akun</button>
-            </form>
-        <?php endif; ?>
-    </div>
+    <?php if (!empty($success)): ?>
+        <div class="alert-ok"><?= htmlspecialchars($success); ?></div>
+        <a href="login.php" style="text-decoration: none;">
+            <button type="button">Lanjut ke Halaman Login</button>
+        </a>
+    <?php elseif ($user_data): ?>
+        <p>
+            Halo <b><?= htmlspecialchars($user_data['nama_user']); ?></b> (<?= htmlspecialchars($user_data['email']); ?>), <br>
+            Silakan buat password baru untuk menyetujui undangan dan mengaktifkan akun Portal Mitra Anda.
+        </p>
+        <form method="POST">
+            <div class="form-group">
+                <label>Password Baru</label>
+                <input type="password" name="password" placeholder="Minimal 6 karakter" required>
+            </div>
+            <div class="form-group">
+                <label>Konfirmasi Password Baru</label>
+                <input type="password" name="confirm_password" placeholder="Ulangi password baru" required>
+            </div>
+            <button type="submit">Setujui & Aktifkan Akun</button>
+        </form>
+    <?php endif; ?>
+</div>
 </body>
 </html>

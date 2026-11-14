@@ -1,6 +1,6 @@
 <?php
 session_start();
-require_once dirname(__DIR__) . '/koneksi.php';
+require_once '../koneksi.php';
 
 // Proteksi Halaman
 if (!isset($_SESSION["loggedin"]) or $_SESSION["loggedin"] !== true) {
@@ -141,7 +141,7 @@ while ($m = mysqli_fetch_assoc($res_monthly)) {
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        /* Styling Tombol Harian / Bulanan agar rapi & biru solid saat aktif */
+        /* ===== Header chart & tombol toggle (Harian/Bulanan, Pagi/Siang/Malam) ===== */
         .chart-header {
             display: flex;
             justify-content: space-between;
@@ -150,33 +150,192 @@ while ($m = mysqli_fetch_assoc($res_monthly)) {
             gap: 10px;
             flex-wrap: wrap;
         }
-        .toggle-buttons {
+        .chart-controls-right {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        /* Wadah: kapsul putih dengan border tipis, tombol aktif "melayang" di dalamnya */
+        .chart-card .toggle-buttons,
+        .chart-card .shift-toggle-buttons {
             display: inline-flex;
-            border: 1px solid #d0d7de;
-            border-radius: 6px;
-            overflow: hidden;
-            background-color: #ffffff;
+            align-items: center;
+            gap: 4px;
+            padding: 4px;
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
         }
-        .toggle-buttons button {
+
+        /* Tombol default */
+        .chart-card .toggle-buttons button,
+        .chart-card .shift-toggle-buttons button {
             border: none;
-            background-color: transparent;
-            padding: 6px 12px;
+            background: transparent;
+            padding: 7px 16px;
+            border-radius: 7px;
             font-family: 'Poppins', sans-serif;
-            font-size: 11px;
-            font-weight: 600;
-            color: #333333;
+            font-size: 12px;
+            font-weight: 500;
+            color: #475569;
             cursor: pointer;
-            transition: all 0.2s ease;
+            transition: background-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
         }
-        .toggle-buttons button:not(:last-child) {
-            border-right: 1px solid #d0d7de;
+
+        /* Hover (tombol yang belum aktif) */
+        .chart-card .toggle-buttons button:hover:not(.active),
+        .chart-card .shift-toggle-buttons button:hover:not(.active) {
+            background: #eef3f9;
+            color: #004b87;
         }
-        .toggle-buttons button:hover:not(.active) {
-            background-color: #f4f6f9;
-        }
-        .toggle-buttons button.active {
-            background-color: #004b87;
+
+        /* Tombol aktif: biru navy solid, sudut membulat, ada bayangan halus */
+        .chart-card .toggle-buttons button.active,
+        .chart-card .shift-toggle-buttons button.active {
+            background: #004b87;
             color: #ffffff;
+            font-weight: 600;
+            box-shadow: 0 2px 6px rgba(0, 75, 135, 0.28);
+        }
+
+        /* Aksesibilitas keyboard */
+        .chart-card .toggle-buttons button:focus-visible,
+        .chart-card .shift-toggle-buttons button:focus-visible {
+            outline: 2px solid #8ab4dc;
+            outline-offset: 1px;
+        }
+
+        /* ===== Kartu statistik (KPI) - tata letak 3 kolom, gaya sesuai desain ===== */
+        .stats-grid {
+            display: grid !important;
+            grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+            gap: 22px !important;
+            margin-bottom: 24px;
+        }
+        .stats-grid .stat-card {
+            display: flex !important;
+            flex-direction: row !important;
+            align-items: center !important;
+            justify-content: flex-start !important;
+            gap: 14px !important;
+            min-height: 142px !important;
+            height: auto !important;
+            padding: 22px 26px !important;
+            background: #004080 !important;
+            border-radius: 16px !important;
+            color: #ffffff !important;
+            text-decoration: none !important;
+            box-shadow: 0 6px 14px rgba(0, 64, 128, 0.22) !important;
+            box-sizing: border-box;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        .stats-grid a.stat-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 22px rgba(0, 64, 128, 0.32) !important;
+        }
+
+        /* Ikon: putih solid, langsung di kartu (tanpa kotak), di kolom kiri */
+        .stats-grid .stat-card .card-icon {
+            flex: 0 0 36% !important;
+            max-width: 36%;
+            width: auto !important;
+            height: auto !important;
+            min-width: 0 !important;
+            display: flex !important;
+            align-items: center;
+            justify-content: center;
+            background: transparent !important;
+            border-radius: 0 !important;
+            color: #ffffff !important;
+            padding: 0;
+            margin: 0;
+        }
+        .stats-grid .stat-card .card-icon svg {
+            width: 58px;
+            height: 58px;
+            display: block;
+        }
+
+        /* Teks di kolom kanan */
+        .stats-grid .stat-card .card-info {
+            display: flex !important;
+            flex-direction: column;
+            justify-content: center;
+            gap: 4px;
+            flex: 1 1 auto;
+            min-width: 0;
+            padding: 0;
+            margin: 0;
+        }
+        .stats-grid .stat-card .card-label {
+            font-size: 13px !important;
+            font-weight: 600 !important;
+            color: #ffffff !important;
+            line-height: 1.3;
+            margin: 0 !important;
+        }
+        .stats-grid .stat-card .card-value {
+            font-size: clamp(22px, 1.7vw, 32px) !important;
+            font-weight: 700 !important;
+            color: #ffffff !important;
+            line-height: 1.15;
+            margin: 0 !important;
+            white-space: nowrap;
+        }
+        .stats-grid .stat-card .card-trend {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 11px !important;
+            font-weight: 400;
+            color: #d3deec !important;
+            margin-top: 4px;
+        }
+
+        /* Perangkat aktif: ikon bulat putih + teks kecil, seperti desain */
+        .stats-grid .stat-card .device-sub-badges {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 8px 14px;
+            margin-top: 6px;
+        }
+        .stats-grid .stat-card .device-sub-badges span {
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            font-size: 11px;
+            font-weight: 500;
+            color: #e3ebf5;
+            background: transparent;
+            padding: 0;
+            white-space: nowrap;
+        }
+        .stats-grid .stat-card .device-sub-badges .dev-ic {
+            width: 26px;
+            height: 26px;
+            border-radius: 50%;
+            background: #ffffff;
+            color: #004080;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+        .stats-grid .stat-card .device-sub-badges .dev-ic svg {
+            width: 16px;
+            height: 16px;
+            display: block;
+        }
+
+        @media (max-width: 992px) {
+            .stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+        }
+        @media (max-width: 600px) {
+            .stats-grid { grid-template-columns: 1fr !important; }
+            .stats-grid .stat-card .card-icon { flex: 0 0 90px !important; max-width: 90px; }
         }
     </style>
 </head>
@@ -308,7 +467,7 @@ while ($m = mysqli_fetch_assoc($res_monthly)) {
             <section class="stats-grid">
                 <!-- Card 1: Total Transaksi -> detailTransaksi.php -->
                 <a href="detailTransaksi.php" class="stat-card clickable-card">
-                    <div class="card-icon"><i class="fa-solid fa-ticket"></i></div>
+                    <div class="card-icon"><svg viewBox="0 0 48 48" fill="currentColor" aria-hidden="true"><g transform="rotate(-20 24 24)"><mask id="mTicket" maskUnits="userSpaceOnUse" x="-20" y="-20" width="90" height="90"><rect x="-20" y="-20" width="90" height="90" fill="#fff"/><circle cx="3" cy="24" r="3.8" fill="#000"/><circle cx="45" cy="24" r="3.8" fill="#000"/><rect x="15" y="17.2" width="18" height="3" rx="1.2" fill="#000"/><rect x="15" y="22.5" width="18" height="3" rx="1.2" fill="#000"/><rect x="15" y="27.8" width="18" height="3" rx="1.2" fill="#000"/></mask><rect x="3" y="12" width="42" height="24" rx="5.5" mask="url(#mTicket)"/></g></svg></div>
                     <div class="card-info">
                         <span class="card-label">Total Transaksi</span>
                         <h2 class="card-value" id="statTransaksi"><?= number_format($total_transaksi, 0, ',', '.'); ?></h2>
@@ -318,7 +477,7 @@ while ($m = mysqli_fetch_assoc($res_monthly)) {
 
                 <!-- Card 2: Gate Aktif -->
                 <div class="stat-card">
-                    <div class="card-icon"><i class="fa-solid fa-torii-gate"></i></div>
+                    <div class="card-icon"><svg viewBox="0 0 48 48" fill="currentColor" aria-hidden="true"><g transform="rotate(-8 24 18)"><mask id="mGate" maskUnits="userSpaceOnUse" x="-20" y="-20" width="90" height="90"><rect x="-20" y="-20" width="90" height="90" fill="#fff"/><rect x="9" y="9.5" width="26" height="9" rx="1.6" fill="#000"/></mask><rect x="4" y="5" width="36" height="22" rx="3.6" mask="url(#mGate)"/><rect x="15" y="12" width="14" height="13" rx="1.3"/></g><path d="M24 45V33.5M19 38.5l5-5 5 5" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
                     <div class="card-info">
                         <span class="card-label">Gate Aktif</span>
                         <h2 class="card-value" id="statGate"><?= $total_gate; ?></h2>
@@ -327,7 +486,7 @@ while ($m = mysqli_fetch_assoc($res_monthly)) {
 
                 <!-- Card 3: Area -->
                 <div class="stat-card">
-                    <div class="card-icon"><i class="fa-solid fa-location-dot"></i></div>
+                    <div class="card-icon"><svg viewBox="0 0 48 48" fill="currentColor" aria-hidden="true"><mask id="mPin" maskUnits="userSpaceOnUse" x="-20" y="-20" width="90" height="90"><rect x="-20" y="-20" width="90" height="90" fill="#fff"/><circle cx="24" cy="16.5" r="5.4" fill="#000"/></mask><path d="M24 3C16.3 3 10 9.2 10 16.8 10 26.8 24 38 24 38S38 26.8 38 16.8C38 9.2 31.7 3 24 3Z" mask="url(#mPin)"/><ellipse cx="24" cy="38" rx="18.5" ry="5.4" fill="none" stroke="currentColor" stroke-width="2"/></svg></div>
                     <div class="card-info">
                         <span class="card-label">Area</span>
                         <h2 class="card-value" id="statArea"><?= $total_area; ?></h2>
@@ -336,7 +495,7 @@ while ($m = mysqli_fetch_assoc($res_monthly)) {
 
                 <!-- Card 4: Mitra Aktif -> daftarMitra.php -->
                 <a href="daftarMitra.php" class="stat-card clickable-card">
-                    <div class="card-icon"><i class="fa-solid fa-handshake"></i></div>
+                    <div class="card-icon"><svg viewBox="0 0 48 48" fill="currentColor" aria-hidden="true"><circle cx="12" cy="11" r="4.8"/><path d="M3.5 26c0-5 3.8-8 8.5-8s8.5 3 8.5 8z"/><circle cx="36" cy="31" r="4.8"/><path d="M27.5 46c0-5 3.8-8 8.5-8s8.5 3 8.5 8z"/><path d="M25 31A11 11 0 0 1 36 20M18 31A18 18 0 0 1 36 13" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round"/></svg></div>
                     <div class="card-info">
                         <span class="card-label">Mitra Aktif</span>
                         <h2 class="card-value" id="statMitra"><?= $total_mitra; ?></h2>
@@ -345,19 +504,19 @@ while ($m = mysqli_fetch_assoc($res_monthly)) {
 
                 <!-- Card 5: Perangkat Aktif -> monitoringArea.php -->
                 <a href="monitoringArea.php" class="stat-card clickable-card">
-                    <div class="card-icon"><i class="fa-solid fa-video"></i></div>
+                    <div class="card-icon"><svg viewBox="0 0 48 48" fill="currentColor" aria-hidden="true"><mask id="mProj" maskUnits="userSpaceOnUse" x="-20" y="-20" width="90" height="90"><rect x="-20" y="-20" width="90" height="90" fill="#fff"/><circle cx="28" cy="22.5" r="7.2" fill="#000"/><circle cx="11" cy="22.5" r="1.9" fill="#000"/></mask><rect x="3" y="11" width="42" height="23" rx="6.5" mask="url(#mProj)"/><circle cx="28" cy="22.5" r="3.5"/><rect x="22" y="36" width="12" height="3.2" rx="1.6"/></svg></div>
                     <div class="card-info">
                         <span class="card-label">Perangkat Aktif</span>
                         <div class="device-sub-badges">
-                            <span><i class="fa-solid fa-person-booth"></i> <?= $total_turnstile; ?> Turnstile</span>
-                            <span><i class="fa-solid fa-camera"></i> <?= $total_cctv; ?> CCTV</span>
+                            <span><i class="dev-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="7" width="6" height="14" rx="1.5"/><circle cx="9" cy="10.5" r="1"/><line x1="10" y1="10.5" x2="21" y2="10.5"/><line x1="9.8" y1="11.3" x2="17" y2="18"/><line x1="8.6" y1="11.6" x2="12" y2="20"/></svg></i> <?= $total_turnstile; ?> Turnstile</span>
+                            <span><i class="dev-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 8.5l12-3.5 2.2 6.3-12 3.5z"/><path d="M16 8l4.5-1.2v4.6L17.6 12"/><path d="M7.5 15.3V20H13"/></svg></i> <?= $total_cctv; ?> CCTV</span>
                         </div>
                     </div>
                 </a>
 
                 <!-- Card 6: Pendapatan -> rekapTransaksi.php -->
                 <a href="rekapTransaksi.php" class="stat-card clickable-card">
-                    <div class="card-icon"><i class="fa-solid fa-money-bill-trend-up"></i></div>
+                    <div class="card-icon"><svg viewBox="0 0 48 48" fill="currentColor" aria-hidden="true"><path d="M5 20L15 10l7 6L34 5" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M26 4.6h8.4V13" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/><g transform="rotate(-8 24 35)"><mask id="mMoney" maskUnits="userSpaceOnUse" x="-20" y="-20" width="90" height="90"><rect x="-20" y="-20" width="90" height="90" fill="#fff"/><circle cx="24" cy="35" r="6.4" fill="#000"/><circle cx="10.5" cy="35" r="1.9" fill="#000"/><circle cx="37.5" cy="35" r="1.9" fill="#000"/></mask><rect x="4" y="26" width="40" height="18" rx="3.2" mask="url(#mMoney)"/><circle cx="24" cy="35" r="3.1"/></g></svg></div>
                     <div class="card-info">
                         <span class="card-label">Pendapatan</span>
                         <h2 class="card-value" id="statPendapatan">Rp <?= number_format($total_pendapatan, 0, ',', '.'); ?></h2>
@@ -486,17 +645,72 @@ while ($m = mysqli_fetch_assoc($res_monthly)) {
             return rawLabel;
         }
 
-        const commonXScale = {
-            grid: { display: false },
-            ticks: {
-                maxRotation: 0,
-                minRotation: 0,
-                autoSkip: false,
-                font: { size: 10 }
+        // INISIALISASI CHART (gaya interaktif sesuai desain)
+        const COLOR_BAR        = '#FFE580';   // kuning muda (normal)
+        const COLOR_BAR_HOVER  = '#F2C400';   // kuning solid (saat di-hover)
+        const COLOR_LINE       = '#F7D95A';
+        const COLOR_LINE_DARK  = '#C99A00';
+
+        Chart.defaults.font.family = "'Poppins', sans-serif";
+        Chart.defaults.color = '#6b7280';
+
+        // Latar abu-abu muda di area plot, seperti di desain
+        const plotAreaBg = {
+            id: 'plotAreaBg',
+            beforeDraw(chart) {
+                const { ctx, chartArea } = chart;
+                if (!chartArea) return;
+                ctx.save();
+                ctx.fillStyle = '#f8fafc';
+                ctx.fillRect(chartArea.left, chartArea.top,
+                             chartArea.right - chartArea.left,
+                             chartArea.bottom - chartArea.top);
+                ctx.restore();
             }
         };
 
-        // INISIALISASI CHART
+        // Judul sumbu X otomatis: "Area" / "Tanggal & Jam" / "Bulan"
+        function xAxisTitlePlugin(getPeriod) {
+            return {
+                id: 'xAxisTitleAuto',
+                beforeUpdate(chart) {
+                    let text = 'Area';
+                    if (isFiltered) text = (getPeriod() === 'harian') ? 'Tanggal & Jam' : 'Bulan';
+                    chart.options.scales.x.title.text = text;
+                }
+            };
+        }
+
+        function makeXScale() {
+            return {
+                grid: { display: false },
+                border: { display: false },
+                ticks: { maxRotation: 0, minRotation: 0, autoSkip: false, font: { size: 11 } },
+                title: { display: true, text: 'Area', color: '#111827',
+                         font: { size: 11, weight: '600' }, padding: { top: 10 } }
+            };
+        }
+
+        const tooltipStyle = {
+            backgroundColor: '#004b87',
+            padding: 12,
+            cornerRadius: 10,
+            displayColors: false,
+            titleFont: { size: 12, weight: '600' },
+            bodyFont: { size: 12 }
+        };
+
+        const legendStyle = {
+            position: 'top',
+            align: 'end',
+            labels: { usePointStyle: true, pointStyle: 'rect', boxWidth: 10, boxHeight: 10 }
+        };
+
+        const hoverCursor = (evt, els) => {
+            evt.native.target.style.cursor = els.length ? 'pointer' : 'default';
+        };
+
+        // ---------- TRAFFIC (BAR) ----------
         const ctxTraffic = document.getElementById('trafficChart').getContext('2d');
         const trafficChart = new Chart(ctxTraffic, {
             type: 'bar',
@@ -505,33 +719,43 @@ while ($m = mysqli_fetch_assoc($res_monthly)) {
                 datasets: [{
                     label: 'Pengunjung',
                     data: areaDataset.trafficBulanan,
-                    backgroundColor: '#F2C94C',
-                    hoverBackgroundColor: '#D4A017',
-                    borderRadius: 5,
-                    maxBarThickness: 28
+                    backgroundColor: COLOR_BAR,
+                    hoverBackgroundColor: COLOR_BAR_HOVER,
+                    borderRadius: { topLeft: 6, topRight: 6 },
+                    borderSkipped: false,
+                    maxBarThickness: 30
                 }]
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
+                animation: { duration: 700, easing: 'easeOutQuart' },
+                interaction: { mode: 'index', intersect: false },
+                onHover: hoverCursor,
                 plugins: {
-                    legend: { position: 'top', align: 'end', labels: { boxWidth: 12 } },
+                    legend: legendStyle,
                     tooltip: {
+                        ...tooltipStyle,
                         callbacks: {
                             title: formatHourlyTooltipTitle,
-                            label: function(ctx) {
-                                return `Total Pengunjung: ${ctx.parsed.y.toLocaleString('id-ID')} orang`;
-                            }
+                            label: ctx => `Total Pengunjung: ${ctx.parsed.y.toLocaleString('id-ID')} orang`
                         }
                     }
                 },
                 scales: {
-                    x: commonXScale,
-                    y: { beginAtZero: true, grid: { color: '#f0f0f0' } }
+                    x: makeXScale(),
+                    y: {
+                        beginAtZero: true,
+                        border: { display: false },
+                        grid: { color: '#e5e7eb' },
+                        ticks: { precision: 0 }
+                    }
                 }
-            }
+            },
+            plugins: [plotAreaBg, xAxisTitlePlugin(() => trafficPeriod)]
         });
 
+        // ---------- PENDAPATAN (LINE) ----------
         const ctxPendapatan = document.getElementById('pendapatanChart').getContext('2d');
         const pendapatanChart = new Chart(ctxPendapatan, {
             type: 'line',
@@ -540,35 +764,59 @@ while ($m = mysqli_fetch_assoc($res_monthly)) {
                 datasets: [{
                     label: 'Pendapatan',
                     data: areaDataset.pendapatanBulanan,
-                    borderColor: '#F2C94C',
-                    backgroundColor: '#F2C94C',
+                    borderColor: COLOR_LINE,
                     borderWidth: 3,
-                    pointBackgroundColor: '#F2C94C',
+                    tension: 0.35,
+                    fill: true,
+                    backgroundColor: function (context) {
+                        const { ctx, chartArea } = context.chart;
+                        if (!chartArea) return 'rgba(247,217,90,0.2)';
+                        const g = ctx.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
+                        g.addColorStop(0, 'rgba(247,217,90,0.45)');
+                        g.addColorStop(1, 'rgba(247,217,90,0.02)');
+                        return g;
+                    },
+                    pointBackgroundColor: COLOR_LINE,
                     pointBorderColor: '#ffffff',
                     pointBorderWidth: 2,
                     pointRadius: 5,
-                    tension: 0.1
+                    pointHoverRadius: 8,
+                    pointHoverBackgroundColor: COLOR_LINE_DARK,
+                    pointHoverBorderColor: '#ffffff',
+                    pointHoverBorderWidth: 3
                 }]
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
+                animation: { duration: 800, easing: 'easeOutQuart' },
+                interaction: { mode: 'index', intersect: false },
+                onHover: hoverCursor,
                 plugins: {
-                    legend: { position: 'top', align: 'end', labels: { boxWidth: 12 } },
+                    legend: legendStyle,
                     tooltip: {
+                        ...tooltipStyle,
                         callbacks: {
                             title: formatHourlyTooltipTitle,
-                            label: function(ctx) {
-                                return `Total Pendapatan: Rp ${ctx.parsed.y.toLocaleString('id-ID')}`;
-                            }
+                            label: ctx => `Total Pendapatan: Rp ${ctx.parsed.y.toLocaleString('id-ID')}`
                         }
                     }
                 },
                 scales: {
-                    x: commonXScale,
-                    y: { beginAtZero: true, grid: { color: '#f0f0f0' } }
+                    x: makeXScale(),
+                    y: {
+                        beginAtZero: true,
+                        border: { display: false },
+                        grid: { color: '#e5e7eb' },
+                        ticks: {
+                            callback: v => v >= 1000000 ? (v / 1000000).toLocaleString('id-ID') + ' jt'
+                                         : v >= 1000    ? (v / 1000).toLocaleString('id-ID') + ' rb'
+                                         : v
+                        }
+                    }
                 }
-            }
+            },
+            plugins: [plotAreaBg, xAxisTitlePlugin(() => pendapatanPeriod)]
         });
 
         // LOGIKA RENDER & TOGGLE CONTROLS
