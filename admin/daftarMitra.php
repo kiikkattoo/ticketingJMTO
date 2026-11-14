@@ -1,22 +1,28 @@
 <?php
 session_start();
-require 'koneksi.php';
+require_once dirname(__DIR__) . '/koneksi.php';
 
 if (!isset($_SESSION["loggedin"]) || $_SESSION["loggedin"] !== true) {
-    header("Location: login.php");
+    header("Location: ../login.php");
     exit();
 }
 
 // Hapus Mitra dari Database
+// Hapus Mitra dan Akun User Terkait secara Bersamaan
 if (isset($_GET['hapus'])) {
-    $hapus_kode = mysqli_real_escape_string($conn, $_GET['hapus']);
-    mysqli_query($conn, "DELETE FROM mitra WHERE kode_mitra = '$hapus_kode'");
+    $kode_hapus = mysqli_real_escape_string($conn, $_GET['hapus']);
+    
+    // 1. Hapus akun user yang terhubung dengan mitra ini terlebih dahulu
+    mysqli_query($conn, "DELETE FROM users WHERE id_mitra = '$kode_hapus'");
+    
+    // 2. Hapus data mitranya
+    mysqli_query($conn, "DELETE FROM mitra WHERE kode_mitra = '$kode_hapus'");
+    
     header("Location: daftarMitra.php?msg=deleted");
     exit();
 }
 
-$res_mitra = mysqli_query($conn, "SELECT * FROM mitra ORDER BY kode_mitra ASC");
-$mitra_list = [];
+$res_mitra = mysqli_query($conn, "SELECT mitra.*, users.status_user FROM mitra LEFT JOIN users ON mitra.kode_mitra = users.id_mitra ORDER BY mitra.kode_mitra ASC");
 while ($row = mysqli_fetch_assoc($res_mitra)) {
     $mitra_list[] = $row;
 }
@@ -27,7 +33,7 @@ while ($row = mysqli_fetch_assoc($res_mitra)) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Daftar Mitra - JMTO Ticketing</title>
-    <link rel="stylesheet" href="style.css?v=<?php echo time(); ?>">
+    <link rel="stylesheet" href="../style.css?v=<?php echo time(); ?>">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
@@ -47,7 +53,7 @@ while ($row = mysqli_fetch_assoc($res_mitra)) {
 <body>
     <div class="dashboard-wrapper">
         <aside class="sidebar">
-            <div class="sidebar-logo"><img src="jasamarga-logo.png" alt="Logo Jasamarga" class="logo-img"></div>
+            <div class="sidebar-logo"><img src="../img/jasamarga-logo.png" alt="Logo Jasamarga" class="logo-img"></div>
             <nav class="sidebar-menu">
                 <a href="dashboard.php" class="menu-item"><i class="fa-solid fa-border-all icon"></i> Dashboard</a>
                 <div class="menu-group">
@@ -74,7 +80,7 @@ while ($row = mysqli_fetch_assoc($res_mitra)) {
                         <a href="daftarPerangkat.php">Perangkat</a>
                     </div>
                 </div>
-                <a href="logout.php" class="menu-item logout"><i class="fa-solid fa-right-from-bracket icon"></i> Keluar</a>
+                <a href="../logout.php" class="menu-item logout"><i class="fa-solid fa-right-from-bracket icon"></i> Keluar</a>
             </nav>
         </aside>
 

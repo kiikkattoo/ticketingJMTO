@@ -5,14 +5,18 @@
     font-family: 'Poppins', sans-serif;
 }
 
-body {
+html, body {
     background-color: #f5f7fa;
     color: #333333;
+    height: auto;
+    min-height: 100vh;
+    overflow-x: hidden;
+    overflow-y: auto;
 }
 
-/* ==========================================
+/* =========================================================
    1. HALAMAN LOGIN
-   ========================================== */
+   ========================================================= */
 .container {
     width: 1180px;
     max-width: 92vw;
@@ -91,7 +95,7 @@ form {
 }
 
 .form-group input:focus {
-    border-color: #004b87;
+    border-color: #004687;
 }
 
 .form-group input.input-error {
@@ -116,7 +120,7 @@ form {
 
 .btn-login {
     width: 100%;
-    background-color: #004b87;
+    background-color: #004687;
     color: #ffffff;
     border: none;
     padding: 15px;
@@ -138,10 +142,9 @@ form {
     background-color: #004b87;
 }
 
-
-/* ==========================================
-   2. DASHBOARD & DETAIL TRANSAKSI
-   ========================================== */
+/* =========================================================
+   2. DASHBOARD & ANALISIS TRANSAKSI (SIDEBAR & LAYOUT)
+   ========================================================= */
 .dashboard-wrapper {
     display: flex;
     width: 100%;
@@ -160,6 +163,7 @@ form {
     padding: 25px 20px;
     display: flex;
     flex-direction: column;
+    overflow-y: auto;
     z-index: 100;
 }
 
@@ -175,26 +179,31 @@ form {
 .sidebar-menu {
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 8px;
+    flex: 1;
 }
 
-.sidebar-menu a, .menu-header {
+.sidebar-menu > a,
+.menu-header {
     text-decoration: none;
     color: #4f4f4f;
     font-size: 13px;
     font-weight: 500;
-    padding: 10px 12px;
-    border-radius: 6px;
+    padding: 11px 14px;
+    border-radius: 10px;
     cursor: pointer;
     display: flex;
     align-items: center;
     gap: 12px;
-    transition: background-color 0.2s;
+    transition: background-color 0.2s, color 0.2s;
 }
 
-.sidebar-menu a.active, .sidebar-menu a:hover, .menu-header:hover {
-    background-color: #eef5fc;
-    color: #004b87;
+.sidebar-menu > a.active,
+.sidebar-menu > a:hover,
+.menu-header:hover,
+.menu-group.current-page > .menu-header {
+    background-color: #EBF3FF;
+    color: #004B87;
     font-weight: 600;
 }
 
@@ -202,42 +211,43 @@ form {
     margin-left: auto;
     font-size: 10px;
     color: #828282;
-    transition: transform 0.3s ease;
+    transition: transform 0.25s ease;
+    transform: rotate(0deg);
 }
 
 .menu-group.active .menu-header .arrow {
     transform: rotate(180deg);
 }
 
-/* Submenu Dropdown */
+/* Submenu Dropdown: Tertutup Default, Terbuka Saat Diklik (.active) */
 .submenu {
-    max-height: 0;
-    overflow: hidden;
-    padding-left: 36px;
-    display: flex;
+    display: none;
     flex-direction: column;
-    gap: 6px;
-    transition: max-height 0.3s ease-out, opacity 0.3s ease-out;
-    opacity: 0;
+    padding-left: 38px;
+    margin-top: 4px;
+    margin-bottom: 4px;
+    gap: 4px;
 }
 
 .menu-group.active .submenu {
-    max-height: 200px;
-    opacity: 1;
-    margin-top: 4px;
-    margin-bottom: 8px;
+    display: flex;
 }
 
 .submenu a {
-    font-size: 12px;
-    padding: 6px 0;
+    font-size: 12.5px;
+    padding: 7px 10px;
+    border-radius: 6px;
     color: #7d7d7d;
     text-decoration: none;
+    display: block;
+    transition: color 0.2s, background-color 0.2s;
 }
 
-.submenu a.sub-active, .submenu a:hover {
-    color: #004b87;
+.submenu a.sub-active,
+.submenu a:hover {
+    color: #004B87;
     font-weight: 600;
+    background-color: #f4f8fd;
 }
 
 .menu-item.logout {
@@ -245,13 +255,20 @@ form {
     color: #eb5757;
 }
 
+.menu-item.logout:hover {
+    background-color: #fce8e6;
+    color: #d93025;
+}
+
 /* Area Konten Utama */
 .main-content {
     margin-left: 250px;
+    width: calc(100% - 250px);
     flex: 1;
-    padding: 30px 40px;
+    padding: 30px 40px 50px 40px;
     min-height: 100vh;
     background-color: #f5f7fa;
+    overflow: visible;
 }
 
 .welcome-text {
@@ -270,7 +287,7 @@ form {
 .filter-card {
     background: #ffffff;
     padding: 20px;
-    border-radius: 8px;
+    border-radius: 12px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.04);
     margin-bottom: 25px;
 }
@@ -299,12 +316,13 @@ form {
     font-weight: 500;
 }
 
-.filter-group select {
+.filter-group select,
+.filter-group input[type="date"] {
     padding: 9px 12px;
     border: 1px solid #e0e0e0;
     border-radius: 6px;
     font-size: 12px;
-    color: #828282;
+    color: #333333;
     outline: none;
     background: #ffffff;
 }
@@ -320,6 +338,7 @@ form {
     font-size: 12px;
     font-weight: 600;
     cursor: pointer;
+    text-decoration: none;
 }
 
 .btn-reset {
@@ -334,7 +353,7 @@ form {
     color: #ffffff;
 }
 
-/* Stats Cards Grid */
+/* Stats Cards Grid (6 Kartu KPI Kotak & Kokoh) */
 .stats-grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
@@ -343,21 +362,22 @@ form {
 }
 
 .stat-card {
-    background: #004b87;
+    background: #004687;
     color: #ffffff;
-    padding: 22px;
-    border-radius: 12px;
+    padding: 26px 24px;
+    min-height: 126px;
+    border-radius: 14px;
     cursor: pointer;
     display: flex;
     align-items: center;
-    gap: 15px;
+    gap: 18px;
     transition: transform 0.2s ease, box-shadow 0.2s ease;
     box-shadow: 0 4px 10px rgba(0, 75, 135, 0.15);
 }
 
 .stat-card:hover, .stat-card:active {
-    transform: translateY(-6px) scale(1.02);
-    box-shadow: 0 10px 20px rgba(0, 75, 135, 0.3);
+    transform: translateY(-4px);
+    box-shadow: 0 10px 20px rgba(0, 75, 135, 0.25);
 }
 
 .card-icon {
@@ -372,17 +392,17 @@ form {
 
 .card-label {
     font-size: 12px;
-    opacity: 0.8;
+    opacity: 0.85;
 }
 
 .card-value {
-    font-size: 24px;
+    font-size: 25px;
     font-weight: 700;
     margin: 4px 0;
 }
 
 .card-sub {
-    font-size: 10px;
+    font-size: 11px;
     opacity: 0.9;
 }
 
@@ -407,7 +427,7 @@ form {
 .chart-card {
     background: #ffffff;
     padding: 24px;
-    border-radius: 8px;
+    border-radius: 12px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.04);
 }
 
@@ -443,7 +463,7 @@ form {
 }
 
 .btn-toggle-group button.active {
-    background: #004b87;
+    background: #004687;
     color: #ffffff;
     font-weight: 600;
 }
@@ -464,18 +484,18 @@ form {
 
 .placeholder-card {
     background: #ffffff;
-    border-radius: 8px;
+    border-radius: 12px;
     height: 380px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.04);
 }
 
-/* ==========================================
+/* =========================================================
    3. HALAMAN DAFTAR TRANSAKSI (TABEL & TOOLBAR)
-   ========================================== */
+   ========================================================= */
 .table-section-card {
     background: #ffffff;
     padding: 25px;
-    border-radius: 8px;
+    border-radius: 12px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.04);
     margin-bottom: 30px;
 }
@@ -483,11 +503,10 @@ form {
 .section-subtitle {
     font-size: 16px;
     font-weight: 700;
-    color: #004b87;
+    color: #004687;
     margin-bottom: 20px;
 }
 
-/* Toolbar: 10/page, Search, Download CSV */
 .table-toolbar {
     display: flex;
     align-items: center;
@@ -525,7 +544,7 @@ form {
 }
 
 .search-box input:focus {
-    border-color: #004b87;
+    border-color: #004687;
 }
 
 .btn-download-csv {
@@ -547,7 +566,6 @@ form {
     background-color: #155d27;
 }
 
-/* Tabel Data Transaksi */
 .table-responsive {
     width: 100%;
     overflow-x: auto;
@@ -560,7 +578,7 @@ form {
 }
 
 #transaksiTable thead th {
-    background-color: #004b87;
+    background-color: #004687;
     color: #ffffff;
     font-size: 12px;
     font-weight: 600;
@@ -583,7 +601,6 @@ form {
     background-color: #f8fafd;
 }
 
-/* Status Badge */
 .status-badge {
     padding: 4px 10px;
     border-radius: 12px;
@@ -609,10 +626,9 @@ form {
 
 .badge-info {
     background-color: #eef5fc;
-    color: #004b87;
+    color: #004687;
 }
 
-/* Pagination */
 .pagination-container {
     display: flex;
     justify-content: flex-end;
@@ -637,7 +653,7 @@ form {
 }
 
 .page-num.active {
-    background-color: #004b87;
+    background-color: #004687;
     color: #ffffff;
     border-color: #004b87;
     font-weight: 600;
@@ -647,7 +663,6 @@ form {
     background-color: #f2f2f2;
 }
 
-/* Header Tambah Role Button */
 .top-header-with-btn {
     display: flex;
     justify-content: space-between;
@@ -656,7 +671,7 @@ form {
 }
 
 .btn-add-primary {
-    background-color: #004b87;
+    background-color: #004687;
     color: #ffffff;
     border: none;
     padding: 10px 18px;
@@ -674,7 +689,6 @@ form {
     background-color: #003663;
 }
 
-/* Layout Utilities Filter */
 .filter-row.align-center {
     align-items: flex-end;
 }
@@ -683,7 +697,6 @@ form {
     flex: 2;
 }
 
-/* Action Icons (Edit & Delete) */
 .action-buttons {
     display: flex;
     justify-content: center;
@@ -725,9 +738,9 @@ form {
     color: #ffffff;
 }
 
-/* ==========================================
-   4. HALAMAN TAMBAH ROLE
-   ========================================== */
+/* =========================================================
+   4. HALAMAN TAMBAH ROLE & FORM
+   ========================================================= */
 .back-link-container {
     margin-bottom: 20px;
 }
@@ -736,7 +749,7 @@ form {
     display: inline-flex;
     align-items: center;
     gap: 8px;
-    color: #004b87;
+    color: #004687;
     font-size: 16px;
     font-weight: 600;
     text-decoration: none;
@@ -785,10 +798,9 @@ form {
 }
 
 .form-group-custom input:focus {
-    border-color: #004b87;
+    border-color: #004687;
 }
 
-/* Input Readonly untuk Auto ID */
 .form-group-custom input.input-readonly {
     background-color: #e9ecef;
     color: #6c757d;
@@ -796,7 +808,6 @@ form {
     border-color: #ced4da;
 }
 
-/* Tombol Form Footer (Cancel & Submit) */
 .form-footer-buttons {
     display: flex;
     justify-content: flex-end;
@@ -809,9 +820,9 @@ form {
     align-items: center;
     justify-content: center;
     padding: 12px 30px;
-    border: 1px solid #004b87;
+    border: 1px solid #004687;
     background-color: #ffffff;
-    color: #004b87;
+    color: #004687;
     font-size: 13px;
     font-weight: 600;
     border-radius: 8px;
@@ -830,7 +841,7 @@ form {
     justify-content: center;
     padding: 12px 32px;
     border: none;
-    background-color: #004b87;
+    background-color: #004687;
     color: #ffffff;
     font-size: 13px;
     font-weight: 600;
@@ -853,7 +864,6 @@ form {
     margin-bottom: 20px;
 }
 
-/* Style Tabel Universal Berlatar Biru Header */
 .custom-table {
     width: 100%;
     border-collapse: collapse;
@@ -861,7 +871,7 @@ form {
 }
 
 .custom-table thead th {
-    background-color: #004b87;
+    background-color: #004687;
     color: #ffffff;
     font-size: 13px;
     font-weight: 600;
@@ -884,7 +894,6 @@ form {
     background-color: #f8fafd;
 }
 
-/* Select Wrapper dengan Panah Kustom Presisi Desain */
 .select-wrapper {
     position: relative;
     width: 100%;
@@ -905,7 +914,8 @@ form {
     cursor: pointer;
 }
 
-.select-wrapper select:invalid, .select-wrapper select option[value=""] {
+.select-wrapper select:invalid,
+.select-wrapper select option[value=""] {
     color: #a0a0a0;
 }
 
@@ -922,7 +932,6 @@ form {
     font-size: 14px;
 }
 
-/* Custom Radio Group (Enable / Disable) */
 .radio-group-container {
     display: flex;
     align-items: center;
@@ -963,7 +972,7 @@ form {
     content: "";
     width: 10px;
     height: 10px;
-    background-color: #004b87;
+    background-color: #004687;
     border-radius: 50%;
     position: absolute;
     top: 50%;
@@ -971,7 +980,6 @@ form {
     transform: translate(-50%, -50%);
 }
 
-/* Styling Section Title & Fake Upload Button untuk Tambah Mitra */
 .form-section-title {
     font-size: 16px;
     font-weight: 700;
@@ -1015,9 +1023,9 @@ form {
     color: #ffffff;
 }
 
-/* ==========================================
+/* =========================================================
    5. HALAMAN MONITORING CCTV
-   ========================================== */
+   ========================================================= */
 .cctv-stats-grid {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
@@ -1043,14 +1051,13 @@ form {
 .cctv-card-title {
     font-size: 22px;
     font-weight: 700;
-    color: #004b87;
+    color: #004687;
 }
 
 .cctv-search {
     max-width: 380px;
 }
 
-/* CCTV Feeds Grid Layout */
 .cctv-grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
@@ -1060,7 +1067,7 @@ form {
 .cctv-item-card {
     border-radius: 10px;
     overflow: hidden;
-    background: #004b87;
+    background: #004687;
     box-shadow: 0 4px 12px rgba(0,0,0,0.08);
 }
 
@@ -1103,7 +1110,6 @@ form {
     letter-spacing: 0.5px;
 }
 
-/* Empty State / Placeholder Before Filter */
 .cctv-empty-placeholder {
     display: flex;
     flex-direction: column;
@@ -1124,9 +1130,9 @@ form {
     font-size: 13px;
 }
 
-/* ==========================================
+/* =========================================================
    6. HALAMAN MONITORING PERANGKAT AREA
-   ========================================== */
+   ========================================================= */
 .gate-grid-container {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
@@ -1152,7 +1158,7 @@ form {
     gap: 10px;
     font-size: 16px;
     font-weight: 700;
-    color: #004b87;
+    color: #004687;
 }
 
 .gate-title-badge i {
@@ -1181,10 +1187,9 @@ form {
 }
 
 .gate-inner-search input:focus {
-    border-color: #004b87;
+    border-color: #004687;
 }
 
-/* List Item Perangkat (Merah & Hijau) */
 .device-monitoring-list {
     display: flex;
     flex-direction: column;
@@ -1204,7 +1209,6 @@ form {
     transform: translateY(-2px);
 }
 
-/* Status Merah (Trouble / Offline) */
 .device-status-item.status-red {
     background-color: #ffe5e5;
 }
@@ -1218,7 +1222,6 @@ form {
     color: #333333;
 }
 
-/* Status Hijau (Normal / Online) */
 .device-status-item.status-green {
     background-color: #e6f7ed;
 }
@@ -1274,7 +1277,7 @@ form {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    color: #004b87;
+    color: #004687;
 }
 
 .device-item-icon svg {
@@ -1282,9 +1285,9 @@ form {
     shape-rendering: geometricPrecision;
 }
 
-/* ==========================================
+/* =========================================================
    7. DASHBOARD 6 CARDS & SHIFT BUTTONS
-   ========================================== */
+   ========================================================= */
 .clickable-card {
     text-decoration: none;
     cursor: pointer;
@@ -1324,7 +1327,6 @@ form {
     border-radius: 20px;
 }
 
-/* Header Chart Controls (Pagi/Siang/Malam + Harian/Bulanan) */
 .chart-title-group {
     display: flex;
     align-items: center;
@@ -1336,7 +1338,7 @@ form {
     height: 28px;
     border-radius: 50%;
     background-color: #eef5fc;
-    color: #004b87;
+    color: #004687;
     display: inline-flex;
     align-items: center;
     justify-content: center;

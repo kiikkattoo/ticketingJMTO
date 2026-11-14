@@ -1,9 +1,9 @@
 <?php
 session_start();
-require 'koneksi.php';
+require_once dirname(__DIR__) . '/koneksi.php';
 
 if (!isset($_SESSION["loggedin"]) or $_SESSION["loggedin"] !== true) {
-    header("Location: login.php");
+    header("Location: ../login.php");
     exit();
 }
 
@@ -77,7 +77,7 @@ while ($row = mysqli_fetch_assoc($res_rekap)) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Rekap Transaksi - JMTO Ticketing</title>
-    <link rel="stylesheet" href="style.css?v=<?php echo time(); ?>">
+    <link rel="stylesheet" href="../style.css?v=<?php echo time(); ?>">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
@@ -177,7 +177,7 @@ while ($row = mysqli_fetch_assoc($res_rekap)) {
 <body>
     <div class="dashboard-wrapper">
         <aside class="sidebar">
-            <div class="sidebar-logo"><img src="jasamarga-logo.png" alt="Logo Jasamarga" class="logo-img"></div>
+            <div class="sidebar-logo"><img src="../img/jasamarga-logo.png" alt="Logo Jasamarga" class="logo-img"></div>
             <nav class="sidebar-menu">
                 <a href="dashboard.php" class="menu-item"><i class="fa-solid fa-border-all icon"></i> Dashboard</a>
                 <div class="menu-group active">
@@ -204,7 +204,7 @@ while ($row = mysqli_fetch_assoc($res_rekap)) {
                         <a href="daftarPerangkat.php">Perangkat</a>
                     </div>
                 </div>
-                <a href="logout.php" class="menu-item logout"><i class="fa-solid fa-right-from-bracket icon"></i> Keluar</a>
+                <a href="../logout.php" class="menu-item logout"><i class="fa-solid fa-right-from-bracket icon"></i> Keluar</a>
             </nav>
         </aside>
 

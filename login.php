@@ -1,13 +1,19 @@
 <?php
 session_start();
-require 'koneksi.php';
+require_once __DIR__ . '/koneksi.php';
 
 if (isset($_SESSION["loggedin"]) && $_SESSION["loggedin"] === true) {
-    header("Location: dashboard.php");
+    if (strtolower($_SESSION["nama_role"] ?? '') === 'mitra') {
+        header("Location: mitra/dashboard.php");
+    } else {
+        header("Location: admin/dashboard.php");
+    }
     exit();
 }
 
+
 $error = "";
+$email = "";
 if ($_SERVER["REQUEST_METHOD"] === "POST") {
     $email    = mysqli_real_escape_string($conn, trim($_POST['email']));
     $password = trim($_POST['password']);
@@ -25,11 +31,17 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             $_SESSION["nama_user"] = $row['nama_user'];
             $_SESSION["email"]     = $row['email'];
             $_SESSION["id_role"]   = $row['id_role'];
+            $_SESSION["nama_role"] = $row['nama_role'];
+            $_SESSION["id_mitra"] = $row['id_mitra'];
 
-            header("Location: dashboard.php");
-            exit();
+if (strtolower($row['nama_role'] ?? '') === 'mitra') {
+    header("Location: mitra/dashboard.php");
+} else {
+    header("Location: admin/dashboard.php");
+}
+exit();
         } else {
-            $error = "Password salah!";
+$error = "Password salah!";
         }
     } else {
         $error = "Email tidak ditemukan di database!";
@@ -52,14 +64,14 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         <!-- Panel Kiri: Form Login -->
         <div class="login-panel">
             <div class="logo-container">
-                <img src="jasamarga-logo.png" alt="Jasamarga Toll Road Operator Logo" class="logo">
+                <img src="img/jasamarga-logo.png" alt="Jasamarga Toll Road Operator Logo" class="logo">
             </div>
 
             <h1 class="title">Login</h1>
             <p class="subtitle">Enter your email and password to access your account.</p>
 
-            <?php if (!empty($general_err)): ?>
-                <div class="alert-error"><?php echo htmlspecialchars($general_err); ?></div>
+            <?php if (!empty($error)): ?>
+                <div class="alert-error"><?php echo htmlspecialchars($error); ?></div>
             <?php endif; ?>
 
             <form action="<?php echo htmlspecialchars($_SERVER["PHP_SELF"]); ?>" method="POST" novalidate>
@@ -71,11 +83,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                         name="email" 
                         placeholder="Masukkan Email" 
                         value="<?php echo htmlspecialchars($email); ?>"
-                        class="<?php echo !empty($email_err) ? 'input-error' : ''; ?>"
                     >
-                    <?php if (!empty($email_err)): ?>
-                        <span class="error-msg"><?php echo htmlspecialchars($email_err); ?></span>
-                    <?php endif; ?>
                 </div>
 
                 <div class="form-group">
@@ -85,11 +93,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                         id="password" 
                         name="password" 
                         placeholder="Masukkan Password" 
-                        class="<?php echo !empty($password_err) ? 'input-error' : ''; ?>"
                     >
-                    <?php if (!empty($password_err)): ?>
-                        <span class="error-msg"><?php echo htmlspecialchars($password_err); ?></span>
-                    <?php endif; ?>
                 </div>
 
                 <button type="submit" class="btn-login">LOGIN</button>

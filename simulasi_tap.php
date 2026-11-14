@@ -272,8 +272,8 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     </form>
 
     <div class="quick-links">
-        <a href="dashboard.php" target="_blank"><i class="fa-solid fa-chart-line"></i> Cek Dashboard JMTO &rarr;</a>
-        <a href="daftarTransaksi.php" target="_blank"><i class="fa-solid fa-list"></i> Cek Daftar Transaksi &rarr;</a>
+        <a href="admin/dashboard.php" target="_blank"><i class="fa-solid fa-chart-line"></i> Cek Dashboard JMTO &rarr;</a>
+        <a href="admin/daftarTransaksi.php" target="_blank"><i class="fa-solid fa-list"></i> Cek Daftar Transaksi &rarr;</a>
     </div>
 </div>
 
