@@ -568,7 +568,7 @@ html, body {
 <!-- MAIN CONTENT -->
 <main class="main-content">
     <div class="breadcrumb-text">Laporan</div>
-    <h1 class="page-title">Analisis Transaksi</h1>
+    <h1 class="page-title">Detail Transaksi</h1>
 
     <!-- BARIS 1: FILTER CARD -->
     <form method="GET" action="detailTransaksi.php" class="filter-card">

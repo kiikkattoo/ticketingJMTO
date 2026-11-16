@@ -263,7 +263,7 @@ $channels = ['Bank DKI', 'GOERS', 'APPSKU', 'Petugas'];
                     <i class="fa-solid fa-chevron-down arrow"></i>
                 </div>
                 <div class="submenu">
-                    <a href="detailTransaksi.php">Analisis Transaksi</a>
+                    <a href="analisisTransaksi.php">Analisis Transaksi</a>
                     <a href="daftarTransaksi.php" class="active-sub">Daftar Transaksi</a>
                     <a href="rekapTransaksi.php">Rekap Transaksi</a>
                 </div>
