@@ -145,6 +145,7 @@ while ($row = mysqli_fetch_assoc($res_gate)) {
                         <a href="daftarRole.php">Role</a>
                         <a href="daftarMitra.php">Mitra</a>
                         <a href="daftarPerangkat.php">Perangkat</a>
+                        <a href="daftarVenue.php">Venue</a>
                     </div>
                 </div>
 
@@ -257,11 +258,6 @@ while ($row = mysqli_fetch_assoc($res_gate)) {
                             </div>
                         </div>
                     <?php endforeach; ?>
-                    <!-- Placeholder Pesan Sebelum Filter Klik -->
-                <div class="cctv-empty-placeholder" id="cctvPlaceholder">
-                    <i class="fa-solid fa-filter"></i>
-                    <p>Silakan pilih <b>Area</b> & <b>Lokasi</b> lalu klik <b>Filter</b> untuk menampilkan tayangan CCTV.</p>
-                </div>
                 </div>
             </section>
         </main>

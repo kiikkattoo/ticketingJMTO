@@ -1,6 +1,7 @@
-<?php
+<?php 
 session_start();
 require '../koneksi.php';
+include '../includes/load_tema_mitra.php'; 
 
 if (!isset($_SESSION["loggedin"]) || $_SESSION["loggedin"] !== true) {
     header("Location: ../login.php");
@@ -125,9 +126,9 @@ $channels = ['Bank DKI', 'GOERS', 'APPSKU', 'Petugas'];
 
 <div class="dashboard-wrapper">
     <aside class="sidebar">
-        <div class="sidebar-logo">
-            <img src="../img/jasamarga-logo.png" alt="Logo Jasamarga" class="logo-img">
-        </div>
+<div class="sidebar-logo">
+    <img src="<?= htmlspecialchars($tema_mitra['logo_portal']); ?>" alt="Logo Venue" class="logo-img" style="width: 45px; height: 45px; border-radius: 50%; object-fit: cover;">
+</div>
         <nav class="sidebar-menu">
             <a href="dashboard.php" class="menu-item"><i class="fa-solid fa-border-all icon"></i> Dashboard</a>
             <div class="menu-group active">

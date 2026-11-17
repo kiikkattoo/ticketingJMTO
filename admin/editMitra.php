@@ -173,6 +173,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     <a href="daftarRole.php">Role</a>
                     <a href="daftarMitra.php" class="sub-active">Mitra</a>
                     <a href="daftarPerangkat.php">Perangkat</a>
+                    <a href="daftarVenue.php">Venue</a>
                 </div>
             </div>
             <a href="../logout.php" class="menu-item logout">

@@ -88,6 +88,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                         <a href="daftarRole.php">Role</a>
                         <a href="daftarMitra.php">Mitra</a>
                         <a href="daftarPerangkat.php">Perangkat</a>
+                        <a href="daftarVenue.php">Venue</a>
                     </div>
                 </div>
                 <a href="../logout.php" class="menu-item logout"><i class="fa-solid fa-right-from-bracket icon"></i> Keluar</a>

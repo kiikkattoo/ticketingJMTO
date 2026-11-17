@@ -183,6 +183,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                         <a href="daftarRole.php">Role</a>
                         <a href="daftarMitra.php">Mitra</a>
                         <a href="daftarPerangkat.php" class="sub-active">Perangkat</a>
+                        <a href="daftarVenue.php">Venue</a>
                     </div>
                 </div>
 
