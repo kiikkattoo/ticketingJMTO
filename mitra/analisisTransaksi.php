@@ -106,6 +106,20 @@ if ($res_channel) {
         /* ===== LAYOUT UMUM ===== */
         .main-content { max-width: 100%; width: 100%; }
 
+        /* ===== LOGO SIDEBAR: posisikan di tengah ===== */
+        .sidebar .sidebar-logo {
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            padding-left: 0 !important;
+            padding-right: 0 !important;
+            text-align: center;
+        }
+        .sidebar .sidebar-logo .logo-img {
+            display: block;
+            margin: 0 auto !important;
+        }
+
         /* ===== KARTU FILTER =====
            Baris 1: Area | Metode | Status
            Baris 2: Periode (kolom 1) ........ Reset + Filter (rata kanan, sejajar kolom 3) */

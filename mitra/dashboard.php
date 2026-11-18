@@ -123,6 +123,20 @@ $show_rev = $tema_mitra['show_revenue'] ?? 1;
 /* ===== LAYOUT UMUM ===== */
 .main-content { max-width: 100%; width: 100%; }
 
+/* ===== LOGO SIDEBAR: posisikan di tengah ===== */
+.sidebar .sidebar-logo {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+    text-align: center;
+}
+.sidebar .sidebar-logo .logo-img {
+    display: block;
+    margin: 0 auto !important;
+}
+
 /* ===== KARTU FILTER ===== */
 .filter-card {
     background: #ffffff;
