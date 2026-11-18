@@ -103,18 +103,156 @@ if ($res_channel) {
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
+        /* ===== LAYOUT UMUM ===== */
         .main-content { max-width: 100%; width: 100%; }
-        .filter-grid-2row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
-        .filter-bottom-bar { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; margin-top: 16px; flex-wrap: wrap; }
-        .filter-bottom-bar .filter-group { flex: 0 0 calc(33.333% - 11px); min-width: 220px; }
-        .filter-actions-right { display: flex; gap: 10px; margin-left: auto; }
-        .stats-grid-3col { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-bottom: 24px; }
-        .donut-legend-custom { display: flex; justify-content: center; flex-wrap: wrap; gap: 16px; margin-top: 14px; font-size: 12px; color: #444; }
-        .donut-legend-item { display: flex; align-items: center; gap: 6px; }
+
+        /* ===== KARTU FILTER =====
+           Baris 1: Area | Metode | Status
+           Baris 2: Periode (kolom 1) ........ Reset + Filter (rata kanan, sejajar kolom 3) */
+        .filter-card {
+            background: #ffffff;
+            border: 1px solid #e5eaf1;
+            border-radius: 16px;
+            padding: 26px 28px;
+            margin-bottom: 26px;
+            box-shadow: 0 2px 10px rgba(15, 23, 42, 0.05);
+        }
+        .filter-grid-2row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px 22px; }
+        .filter-bottom-bar {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 18px 22px;
+            align-items: end;
+            margin-top: 18px;
+        }
+        .filter-bottom-bar .filter-group { grid-column: 1; min-width: 0; flex: none; }
+        .filter-actions-right { grid-column: 3; display: flex; justify-content: flex-end; gap: 12px; margin-left: 0; }
+
+        .filter-group { display: flex; flex-direction: column; gap: 7px; }
+        .filter-group label { font-size: 13px; font-weight: 500; color: #475569; }
+        .filter-group select {
+            width: 100%;
+            height: 44px;
+            padding: 0 14px;
+            border: 1px solid #dbe2ea;
+            border-radius: 10px;
+            background: #ffffff;
+            font-family: 'Poppins', sans-serif;
+            font-size: 13px;
+            color: #334155;
+            outline: none;
+            cursor: pointer;
+            transition: border-color .2s, box-shadow .2s;
+        }
+        .filter-group select:focus {
+            border-color: var(--mitra-primer, #003f7f);
+            box-shadow: 0 0 0 3px rgba(0, 63, 127, 0.10);
+        }
+        .filter-actions-right .btn-reset,
+        .filter-actions-right .btn-filter {
+            height: 44px;
+            min-width: 100px;
+            padding: 0 26px;
+            border-radius: 10px;
+            font-family: 'Poppins', sans-serif;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            justify-content: center;
+            transition: transform .15s, box-shadow .2s, background .2s;
+        }
+        .filter-actions-right .btn-reset { background: #ffffff; border: 1.5px solid var(--mitra-primer, #003f7f); color: #0f172a; }
+        .filter-actions-right .btn-reset:hover { background: #f1f5f9; }
+        .filter-actions-right .btn-filter { background: var(--mitra-primer, #003f7f); border: 1.5px solid var(--mitra-primer, #003f7f); color: #ffffff; }
+        .filter-actions-right .btn-filter:hover { transform: translateY(-1px); box-shadow: 0 6px 14px rgba(0,0,0,0.2); }
+
+        /* ===== KARTU STATISTIK (3 x 2) ===== */
+        .stats-grid-3col { display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px; margin-bottom: 28px; }
+        .stats-grid-3col .stat-card {
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            gap: 18px;
+            min-height: 124px;
+            padding: 20px 26px;
+            background: var(--mitra-primer, #003f7f);
+            border-radius: 18px;
+            color: #ffffff;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.14);
+            box-sizing: border-box;
+            transition: transform .2s ease, box-shadow .2s ease;
+        }
+        .stats-grid-3col .stat-card::after {
+            content: "";
+            position: absolute;
+            right: -34px; top: -34px;
+            width: 120px; height: 120px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.07);
+            pointer-events: none;
+        }
+        .stats-grid-3col .stat-card:hover { transform: translateY(-3px); box-shadow: 0 12px 26px rgba(0,0,0,0.2); }
+        .stats-grid-3col .stat-card .card-icon {
+            flex: 0 0 64px;
+            width: 64px; height: 64px;
+            display: flex; align-items: center; justify-content: center;
+            background: rgba(255,255,255,0.14);
+            border-radius: 16px;
+            color: #ffffff;
+        }
+        .stats-grid-3col .stat-card .card-icon i { font-size: 28px; color: #ffffff; }
+        .stats-grid-3col .stat-card .card-info { display: flex; flex-direction: column; justify-content: center; gap: 4px; flex: 1; min-width: 0; }
+        .stats-grid-3col .stat-card .card-label { font-size: 13px; font-weight: 600; color: #ffffff; margin: 0; }
+        .stats-grid-3col .stat-card .card-value {
+            font-size: clamp(22px, 2vw, 30px);
+            font-weight: 700;
+            color: #ffffff;
+            margin: 0;
+            line-height: 1.15;
+            white-space: nowrap;
+        }
+        .stats-grid-3col .stat-card .card-trend { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 500; color: rgba(255,255,255,0.88); }
+
+        /* ===== KARTU GRAFIK ===== */
+        .charts-grid { display: grid; grid-template-columns: 1.15fr 1fr; gap: 24px; align-items: stretch; }
+        .chart-card {
+            background: #ffffff;
+            border: 1px solid #e5eaf1;
+            border-radius: 18px;
+            padding: 22px 24px;
+            box-shadow: 0 2px 10px rgba(15, 23, 42, 0.05);
+            min-width: 0;
+        }
+        .chart-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+        .chart-title-group { display: flex; align-items: center; gap: 10px; }
+        .chart-title-icon {
+            width: 34px; height: 34px;
+            display: inline-flex; align-items: center; justify-content: center;
+            border-radius: 10px;
+            background: #eef3fa;
+            color: var(--mitra-primer, #003f7f);
+            font-size: 15px;
+        }
+        .chart-title { font-size: 16px; font-weight: 600; color: #1e293b; margin: 0; }
+        .chart-canvas-wrapper { position: relative; width: 100%; }
+
+        .donut-legend-custom { display: flex; justify-content: center; flex-wrap: wrap; gap: 18px; margin-top: 16px; font-size: 12px; color: #475569; }
+        .donut-legend-item { display: flex; align-items: center; gap: 6px; text-transform: capitalize; }
         .legend-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+
+        /* ===== RESPONSIF ===== */
+        @media (max-width: 1200px) {
+            .stats-grid-3col { grid-template-columns: repeat(2, 1fr); }
+            .charts-grid { grid-template-columns: 1fr; }
+        }
         @media (max-width: 992px) {
-            .filter-grid-2row, .stats-grid-3col { grid-template-columns: 1fr; }
-            .filter-bottom-bar .filter-group { flex: 1 1 100%; }
+            .filter-grid-2row, .filter-bottom-bar { grid-template-columns: 1fr; }
+            .filter-bottom-bar .filter-group, .filter-actions-right { grid-column: 1; }
+            .filter-actions-right { justify-content: stretch; }
+            .filter-actions-right .btn-reset, .filter-actions-right .btn-filter { flex: 1; }
+            .stats-grid-3col { grid-template-columns: 1fr; }
         }
     </style>
 </head>
@@ -377,4 +515,3 @@ if ($res_channel) {
 </script>
 </body>
 </html>
-

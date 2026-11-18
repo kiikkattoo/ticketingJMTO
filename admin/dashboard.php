@@ -169,7 +169,8 @@ $total_cctv = (int)mysqli_fetch_assoc($res_cctv)['jml'];
 // =========================================================================
 // 2. QUERY OPSI DROPDOWN FILTER DARI DATABASE
 // =========================================================================
-$opt_mitra  = mysqli_query($conn, "SELECT DISTINCT nama_mitra FROM mitra ORDER BY nama_mitra ASC");
+// Mitra ikut mengambil kategori_mitra supaya dropdown Mitra bisa difilter per kategori
+$opt_mitra  = mysqli_query($conn, "SELECT DISTINCT nama_mitra, kategori_mitra FROM mitra ORDER BY nama_mitra ASC");
 $opt_area   = mysqli_query($conn, "SELECT DISTINCT nama_area FROM area_lokasi ORDER BY nama_area ASC");
 $opt_lokasi = mysqli_query($conn, "SELECT DISTINCT nama_lokasi FROM area_lokasi ORDER BY nama_lokasi ASC");
 
@@ -179,9 +180,9 @@ $opt_lokasi = mysqli_query($conn, "SELECT DISTINCT nama_lokasi FROM area_lokasi 
 $query_chart_area = "SELECT 
                         a.nama_area,
                         COUNT(CASE WHEN DATE(t.waktu_transaksi) = CURDATE() AND t.status_transaksi = 'Berhasil' THEN 1 END) AS traffic_harian,
-                        COUNT(CASE WHEN t.status_transaksi = 'Berhasil' THEN 1 END) AS traffic_bulanan,
+                        COUNT(CASE WHEN MONTH(t.waktu_transaksi) = MONTH(CURDATE()) AND YEAR(t.waktu_transaksi) = YEAR(CURDATE()) AND t.status_transaksi = 'Berhasil' THEN 1 END) AS traffic_bulanan,
                         COALESCE(SUM(CASE WHEN DATE(t.waktu_transaksi) = CURDATE() AND t.status_transaksi = 'Berhasil' THEN t.nominal ELSE 0 END), 0) AS pend_harian,
-                        COALESCE(SUM(CASE WHEN t.status_transaksi = 'Berhasil' THEN t.nominal ELSE 0 END), 0) AS pend_bulanan
+                        COALESCE(SUM(CASE WHEN MONTH(t.waktu_transaksi) = MONTH(CURDATE()) AND YEAR(t.waktu_transaksi) = YEAR(CURDATE()) AND t.status_transaksi = 'Berhasil' THEN t.nominal ELSE 0 END), 0) AS pend_bulanan
                     FROM area_lokasi a
                     LEFT JOIN transaksi t ON a.id_area = t.id_area
                     GROUP BY a.nama_area
@@ -565,7 +566,7 @@ $bulan_nama = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'O
                     <select id="filterMitra">
                         <option value="">Pilih mitra</option>
                         <?php while ($m = mysqli_fetch_assoc($opt_mitra)): ?>
-                            <option value="<?= htmlspecialchars($m['nama_mitra']); ?>"><?= htmlspecialchars($m['nama_mitra']); ?></option>
+                            <option value="<?= htmlspecialchars($m['nama_mitra']); ?>" data-kategori="<?= htmlspecialchars($m['kategori_mitra'] ?? ''); ?>"><?= htmlspecialchars($m['nama_mitra']); ?></option>
                         <?php endwhile; ?>
                     </select>
                 </div>
@@ -709,6 +710,41 @@ function toggleDropdown(element) {
     element.parentElement.classList.toggle('active');
 }
 
+// ===== Filter bertingkat: Kategori Mitra -> Mitra =====
+const selKategori = document.getElementById('filterKategori');
+const selMitra    = document.getElementById('filterMitra');
+
+// Simpan semua mitra (beserta kategorinya) sekali saat halaman dimuat
+const semuaMitra = Array.from(selMitra.options)
+    .filter(o => o.value !== '')
+    .map(o => ({ nama: o.value, kategori: o.dataset.kategori || '' }));
+
+function updateOpsiMitra() {
+    const kat     = selKategori.value;
+    const dipilih = selMitra.value;
+    const hasil   = semuaMitra.filter(m => !kat || m.kategori === kat);
+
+    selMitra.innerHTML = '';
+
+    const placeholder = document.createElement('option');
+    placeholder.value = '';
+    placeholder.textContent = (kat && hasil.length === 0) ? 'Tidak ada mitra di kategori ini' : 'Pilih mitra';
+    selMitra.appendChild(placeholder);
+
+    hasil.forEach(m => {
+        const opt = document.createElement('option');
+        opt.value = m.nama;
+        opt.dataset.kategori = m.kategori;
+        opt.textContent = m.nama;
+        selMitra.appendChild(opt);
+    });
+
+    // Pertahankan pilihan mitra sebelumnya hanya jika masih cocok dengan kategori
+    selMitra.value = hasil.some(m => m.nama === dipilih) ? dipilih : '';
+}
+
+selKategori.addEventListener('change', updateOpsiMitra);
+
 // DATASET DINAMIS DARI DATABASE MYSQL
 const initialStats = {
     transaksi: "<?= number_format($total_transaksi, 0, ',', '.'); ?>",
@@ -729,6 +765,12 @@ const areaDataset = {
 const jamLabels   = <?= json_encode($jam_labels); ?>;
 const bulanLabels = <?= json_encode($bulan_nama); ?>;
 
+// Teks keterangan periode untuk mode tanpa filter
+const bulanPanjang  = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+const sekarang      = new Date();
+const labelHariIni  = sekarang.getDate() + ' ' + bulanLabels[sekarang.getMonth()] + ' ' + sekarang.getFullYear();
+const labelBulanIni = bulanPanjang[sekarang.getMonth()] + ' ' + sekarang.getFullYear();
+
 let isFiltered       = false;
 let periodLabel      = 'Semua Waktu';
 let filteredData     = null;
@@ -742,7 +784,17 @@ function formatHourlyTooltipTitle(context) {
     if (isFiltered && period === 'harian') {
         return `Jam ${label}:00 - ${label}:59`;
     }
+    if (!isFiltered) {
+        return `${label} · ${period === 'harian' ? 'Hari ini' : 'Bulan ini'}`;
+    }
     return label;
+}
+
+// Keterangan tambahan tooltip (mode filter): tegaskan bahwa angka adalah akumulasi
+function formatAkumulasiNote(ctx) {
+    if (!isFiltered) return '';
+    const rentang = (periodLabel && periodLabel !== 'Semua Waktu') ? periodLabel : 'seluruh data';
+    return 'Akumulasi ' + rentang;
 }
 
 // INISIALISASI CHART
@@ -770,9 +822,12 @@ function xAxisTitlePlugin(getPeriod) {
     return {
         id: 'xAxisTitleAuto',
         beforeUpdate(chart) {
-            let text = 'Area';
+            const p = getPeriod();
+            let text;
             if (isFiltered) {
-                text = (getPeriod() === 'harian') ? 'Jam (' + periodLabel + ')' : 'Bulan';
+                text = (p === 'harian') ? 'Total per jam · ' + periodLabel : 'Total per bulan · ' + periodLabel;
+            } else {
+                text = (p === 'harian') ? 'Area · Hari ini (' + labelHariIni + ')' : 'Area · Bulan ini (' + labelBulanIni + ')';
             }
             chart.options.scales.x.title.text = text;
         }
@@ -791,16 +846,18 @@ function makeXScale() {
 const emptyNote = {
     id: 'emptyNote',
     afterDraw(chart) {
-        if (!isFiltered) return;
         const data = chart.data.datasets[0].data;
         if (data.some(v => v > 0)) return;
+        const period = (chart.canvas.id === 'trafficChart') ? trafficPeriod : pendapatanPeriod;
+        const pesan  = isFiltered ? 'Belum ada transaksi pada periode ini'
+                     : (period === 'harian' ? 'Belum ada transaksi hari ini' : 'Belum ada transaksi bulan ini');
         const { ctx, chartArea } = chart;
         ctx.save();
         ctx.fillStyle = '#9ca3af';
         ctx.font = "500 13px 'Poppins', sans-serif";
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillText('Belum ada transaksi pada periode ini', (chartArea.left + chartArea.right) / 2, (chartArea.top + chartArea.bottom) / 2);
+        ctx.fillText(pesan, (chartArea.left + chartArea.right) / 2, (chartArea.top + chartArea.bottom) / 2);
         ctx.restore();
     }
 };
@@ -832,7 +889,7 @@ const trafficChart = new Chart(ctxTraffic, {
         labels: areaDataset.labels,
         datasets: [{
             label: 'Pengunjung',
-            data: areaDataset.trafficBulanan,
+            data: areaDataset.trafficHarian,
             backgroundColor: COLOR_BAR,
             hoverBackgroundColor: COLOR_BAR_HOVER,
             borderRadius: { topLeft: 6, topRight: 6 },
@@ -852,7 +909,8 @@ const trafficChart = new Chart(ctxTraffic, {
                 ...tooltipStyle,
                 callbacks: {
                     title: formatHourlyTooltipTitle,
-                    label: ctx => `Total Pengunjung: ${ctx.parsed.y.toLocaleString('id-ID')} orang`
+                    label: ctx => `Total Pengunjung: ${ctx.parsed.y.toLocaleString('id-ID')} orang`,
+                    afterLabel: formatAkumulasiNote
                 }
             }
         },
@@ -877,7 +935,7 @@ const pendapatanChart = new Chart(ctxPendapatan, {
         labels: areaDataset.labels,
         datasets: [{
             label: 'Pendapatan',
-            data: areaDataset.pendapatanBulanan,
+            data: areaDataset.pendapatanHarian,
             borderColor: COLOR_LINE,
             borderWidth: 3,
             tension: 0.35,
@@ -912,7 +970,8 @@ const pendapatanChart = new Chart(ctxPendapatan, {
                 ...tooltipStyle,
                 callbacks: {
                     title: formatHourlyTooltipTitle,
-                    label: ctx => `Total Pendapatan: Rp ${ctx.parsed.y.toLocaleString('id-ID')}`
+                    label: ctx => `Total Pendapatan: Rp ${ctx.parsed.y.toLocaleString('id-ID')}`,
+                    afterLabel: formatAkumulasiNote
                 }
             }
         },
@@ -937,7 +996,7 @@ const pendapatanChart = new Chart(ctxPendapatan, {
 function renderTrafficChart() {
     if (!isFiltered || !filteredData) {
         trafficChart.data.labels = areaDataset.labels;
-        trafficChart.data.datasets[0].data = areaDataset.trafficBulanan;
+        trafficChart.data.datasets[0].data = (trafficPeriod === 'harian') ? areaDataset.trafficHarian : areaDataset.trafficBulanan;
     } else if (trafficPeriod === 'harian') {
         trafficChart.data.labels = jamLabels;
         trafficChart.data.datasets[0].data = filteredData.traffic;
@@ -951,7 +1010,7 @@ function renderTrafficChart() {
 function renderPendapatanChart() {
     if (!isFiltered || !filteredData) {
         pendapatanChart.data.labels = areaDataset.labels;
-        pendapatanChart.data.datasets[0].data = areaDataset.pendapatanBulanan;
+        pendapatanChart.data.datasets[0].data = (pendapatanPeriod === 'harian') ? areaDataset.pendapatanHarian : areaDataset.pendapatanBulanan;
     } else if (pendapatanPeriod === 'harian') {
         pendapatanChart.data.labels = jamLabels;
         pendapatanChart.data.datasets[0].data = filteredData.pendapatan;
@@ -1026,6 +1085,7 @@ async function applyDashboardFilter() {
 
 function resetDashboardFilter() {
     document.getElementById('filterKategori').value = "";
+    updateOpsiMitra(); // kembalikan dropdown Mitra ke daftar lengkap
     document.getElementById('filterMitra').value = "";
     document.getElementById('filterArea').value = "";
     document.getElementById('filterLokasi').value = "";

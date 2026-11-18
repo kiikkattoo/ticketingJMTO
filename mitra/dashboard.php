@@ -76,7 +76,7 @@ $d_perangkat = ($q_perangkat) ? mysqli_fetch_assoc($q_perangkat) : [];
 $turnstile_aktif = (int)($d_perangkat['jml_turnstile'] ?? 0);
 $cctv_aktif      = (int)($d_perangkat['jml_cctv'] ?? 0);
 
-// Data Grafik
+// Data Grafik Harian (per jam, 00 - 23)
 $hourly_traffic = array_fill(0, 24, 0);
 $hourly_pendapatan = array_fill(0, 24, 0);
 $q_harian = mysqli_query($conn, "SELECT HOUR(t.waktu_transaksi) AS jam_trx, COUNT(t.id_transaksi) AS jml_pengunjung, COALESCE(SUM(CASE WHEN t.status_transaksi = 'Berhasil' THEN t.nominal ELSE 0 END), 0) AS omzet FROM transaksi t INNER JOIN area_lokasi a ON t.id_area = a.id_area $sql_where_trx GROUP BY HOUR(t.waktu_transaksi)");
@@ -87,20 +87,12 @@ if ($q_harian) {
         $hourly_pendapatan[$h] = (float)$rh['omzet'];
     }
 }
-$tgl_label = date('d/m');
-$shift_ranges = ['pagi' => [0, 12], 'siang' => [13, 18], 'malam' => [19, 23]];
-$shift_data = [];
-foreach ($shift_ranges as $nama_shift => $range) {
-    $lbl = []; $trf = []; $pen = [];
-    for ($i = $range[0]; $i <= $range[1]; $i++) {
-        $lbl[] = [$tgl_label, str_pad($i, 2, '0', STR_PAD_LEFT) . ':00'];
-        $trf[] = $hourly_traffic[$i];
-        $pen[] = $hourly_pendapatan[$i];
-    }
-    $shift_data[$nama_shift] = ['labels' => $lbl, 'traffic' => $trf, 'pendapatan' => $pen];
+$harian_labels = []; $harian_traffic = []; $harian_pendapatan = [];
+for ($i = 0; $i <= 23; $i++) {
+    $harian_labels[]     = str_pad($i, 2, '0', STR_PAD_LEFT);
+    $harian_traffic[]    = $hourly_traffic[$i];
+    $harian_pendapatan[] = $hourly_pendapatan[$i];
 }
-$jam_now = (int)date('G');
-$default_shift = ($jam_now <= 12) ? 'pagi' : (($jam_now <= 18) ? 'siang' : 'malam');
 
 $nama_bulan_id = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
 $bulanan_labels = []; $bulanan_traffic = []; $bulanan_pendapatan = [];
@@ -128,49 +120,213 @@ $show_rev = $tema_mitra['show_revenue'] ?? 1;
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <style>
+/* ===== LAYOUT UMUM ===== */
 .main-content { max-width: 100%; width: 100%; }
+
+/* ===== KARTU FILTER ===== */
+.filter-card {
+    background: #ffffff;
+    border: 1px solid #e8edf3;
+    border-radius: 16px;
+    padding: 22px 24px;
+    margin-bottom: 24px;
+    box-shadow: 0 2px 10px rgba(15, 23, 42, 0.05);
+}
 .filter-grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; width: 100%; }
-.filter-footer-row { display: flex; justify-content: flex-end; gap: 10px; margin-top: 16px; }
+.filter-group { display: flex; flex-direction: column; gap: 6px; }
+.filter-group label { font-size: 12px; font-weight: 600; color: #475569; letter-spacing: 0.2px; }
+.filter-group select {
+    width: 100%;
+    height: 42px;
+    padding: 0 12px;
+    border: 1px solid #dbe2ea;
+    border-radius: 10px;
+    background: #f8fafc;
+    font-family: 'Poppins', sans-serif;
+    font-size: 13px;
+    color: #334155;
+    outline: none;
+    cursor: pointer;
+    transition: border-color .2s, box-shadow .2s, background .2s;
+}
+.filter-group select:hover { background: #ffffff; }
+.filter-group select:focus {
+    border-color: var(--mitra-primer);
+    background: #ffffff;
+    box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.06);
+}
+.filter-footer-row { display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px; }
+.filter-footer-row .btn-reset,
+.filter-footer-row .btn-filter {
+    height: 40px;
+    padding: 0 24px;
+    border-radius: 10px;
+    font-family: 'Poppins', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform .15s, box-shadow .2s, background .2s;
+}
+.filter-footer-row .btn-reset { background: #ffffff; border: 1px solid #dbe2ea; color: #475569; }
+.filter-footer-row .btn-reset:hover { background: #f1f5f9; }
+.filter-footer-row .btn-filter { background: var(--mitra-primer); border: none; color: #ffffff; }
+.filter-footer-row .btn-filter:hover { transform: translateY(-1px); box-shadow: 0 6px 14px rgba(0,0,0,0.18); }
+
+/* ===== KARTU STATISTIK =====
+   Grid 6 kolom: 3 kartu di baris atas (masing-masing 2 kolom),
+   2 kartu di baris bawah (masing-masing 3 kolom) sehingga melebar penuh & rata. */
+.stats-grid {
+    display: grid !important;
+    grid-template-columns: repeat(6, 1fr) !important;
+    gap: 20px !important;
+    margin-bottom: 24px;
+}
+.stats-grid .stat-card { grid-column: span 2; }
+.stats-grid .stat-card:nth-child(n+4) { grid-column: span 3; }
+.stats-grid .stat-card:nth-child(4):last-child { grid-column: span 6; }
+
+.stats-grid .stat-card {
+    position: relative;
+    overflow: hidden;
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    gap: 18px !important;
+    min-height: 120px !important;
+    padding: 22px 26px !important;
+    background: linear-gradient(135deg, var(--mitra-primer) 0%, var(--mitra-primer) 55%, rgba(255,255,255,0.12) 160%) !important;
+    background-color: var(--mitra-primer) !important;
+    border-radius: 18px !important;
+    color: #ffffff !important;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.14) !important;
+    box-sizing: border-box;
+    transition: transform .2s ease, box-shadow .2s ease;
+}
+.stats-grid .stat-card::after {
+    content: "";
+    position: absolute;
+    right: -30px; top: -30px;
+    width: 110px; height: 110px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.08);
+    pointer-events: none;
+}
+.stats-grid .stat-card:hover { transform: translateY(-3px); box-shadow: 0 12px 26px rgba(0,0,0,0.2) !important; }
+
+.stats-grid .stat-card .card-icon {
+    flex: 0 0 64px !important;
+    width: 64px; height: 64px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255,255,255,0.16);
+    border-radius: 16px;
+    color: #ffffff !important;
+}
+.stats-grid .stat-card .card-icon i { font-size: 28px !important; }
+.stats-grid .stat-card .card-info {
+    display: flex !important;
+    flex-direction: column;
+    justify-content: center;
+    align-items: flex-start !important;
+    gap: 8px;
+    flex: 1;
+    min-width: 0;
+    position: relative;
+    z-index: 1;
+}
+.stats-grid .stat-card .card-label {
+    font-size: 12px !important;
+    font-weight: 500 !important;
+    color: rgba(255,255,255,0.85) !important;
+    margin: 0 !important;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+}
+.stats-grid .stat-card .card-value {
+    font-size: clamp(20px, 1.8vw, 28px) !important;
+    font-weight: 700 !important;
+    color: #ffffff !important;
+    margin: 0 !important;
+    line-height: 1.15;
+    white-space: nowrap;
+}
+
+/* Kartu Perangkat Aktif: label di atas, badge Turnstile & CCTV berjajar rapi di bawahnya */
+.stats-grid .stat-card .device-sub-badges {
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: wrap;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    gap: 10px !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    width: auto !important;
+    align-self: flex-start !important;
+}
+.stats-grid .stat-card .device-sub-badges span {
+    display: inline-flex !important;
+    align-items: center;
+    gap: 8px;
+    margin: 0 !important;
+    padding: 5px 14px 5px 6px;
+    background: rgba(255,255,255,0.16) !important;
+    border-radius: 99px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #ffffff !important;
+    white-space: nowrap;
+}
+.dev-ic {
+    width: 24px; height: 24px;
+    border-radius: 50%;
+    background: #ffffff;
+    color: var(--mitra-primer);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    font-style: normal;
+    flex-shrink: 0;
+}
+.dev-ic i { color: var(--mitra-primer); }
+.dev-ic svg { color: var(--mitra-primer); display: block; }
+
+/* ===== KARTU GRAFIK ===== */
+.charts-grid { align-items: stretch; }
+.chart-card {
+    background: #ffffff;
+    border: 1px solid #e8edf3;
+    border-radius: 18px;
+    padding: 22px 24px;
+    box-shadow: 0 2px 10px rgba(15, 23, 42, 0.05);
+    min-width: 0;
+}
+.chart-title { font-size: 16px; font-weight: 600; color: #1e293b; margin: 0; }
 .chart-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; gap: 10px; flex-wrap: wrap; }
 .chart-controls-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.chart-card .toggle-buttons, .chart-card .shift-toggle-buttons { display: inline-flex; align-items: center; gap: 4px; padding: 4px; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px; }
-.chart-card .toggle-buttons button, .chart-card .shift-toggle-buttons button { border: none; background: transparent; padding: 7px 16px; border-radius: 7px; font-family: 'Poppins', sans-serif; font-size: 12px; font-weight: 500; color: #475569; cursor: pointer; transition: 0.2s; }
-.chart-card .toggle-buttons button.active, .chart-card .shift-toggle-buttons button.active { background: var(--mitra-primer); color: #ffffff; font-weight: 600; }
+.chart-card .toggle-buttons { display: inline-flex; align-items: center; gap: 4px; padding: 4px; background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 10px; }
+.chart-card .toggle-buttons button { border: none; background: transparent; padding: 7px 14px; border-radius: 7px; font-family: 'Poppins', sans-serif; font-size: 12px; font-weight: 500; color: #475569; cursor: pointer; transition: 0.2s; }
+.chart-card .toggle-buttons button:hover:not(.active) { background: #e2e8f0; }
+.chart-card .toggle-buttons button.active { background: var(--mitra-primer); color: #ffffff; font-weight: 600; box-shadow: 0 2px 6px rgba(0,0,0,0.15); }
+.chart-canvas-wrapper { position: relative; width: 100%; }
 
-/* PERBAIKAN GRID KARTU STATISTIK SESUAI DESAIN ASLI (3 DI ATAS, 2 DI BAWAH) */
-.stats-grid { 
-    display: grid !important; 
-    grid-template-columns: repeat(3, 1fr) !important; 
-    gap: 22px !important; 
-    margin-bottom: 24px; 
+/* ===== RESPONSIF ===== */
+@media (max-width: 1200px) {
+    .stats-grid { grid-template-columns: repeat(2, 1fr) !important; }
+    .stats-grid .stat-card,
+    .stats-grid .stat-card:nth-child(n+4) { grid-column: span 1; }
+    .stats-grid .stat-card:last-child:nth-child(odd) { grid-column: span 2; }
 }
-.stats-grid .stat-card { 
-    display: flex !important; 
-    flex-direction: row !important; 
-    align-items: center !important; 
-    gap: 14px !important; 
-    min-height: 130px !important; 
-    padding: 20px 24px !important; 
-    background: var(--mitra-primer) !important; 
-    border-radius: 16px !important; 
-    color: #ffffff !important; 
-    box-shadow: 0 6px 14px rgba(0,0,0,0.12) !important; 
-    box-sizing: border-box; 
+@media (max-width: 992px) {
+    .filter-grid-3 { grid-template-columns: 1fr !important; }
+    .stats-grid { grid-template-columns: 1fr !important; }
+    .stats-grid .stat-card,
+    .stats-grid .stat-card:nth-child(n+4),
+    .stats-grid .stat-card:last-child:nth-child(odd) { grid-column: span 1; }
+    .charts-grid { grid-template-columns: 1fr !important; }
 }
-.stats-grid .stat-card .card-icon { 
-    flex: 0 0 32% !important; 
-    display: flex; 
-    align-items: center; 
-    justify-content: center; 
-    color: #ffffff !important; 
-}
-.stats-grid .stat-card .card-icon i { font-size: 42px !important; }
-.stats-grid .stat-card .card-info { display: flex !important; flex-direction: column; justify-content: center; gap: 4px; flex: 1; }
-.stats-grid .stat-card .card-label { font-size: 13px !important; font-weight: 600 !important; color: #ffffff !important; margin: 0 !important; }
-.stats-grid .stat-card .card-value { font-size: clamp(18px, 1.4vw, 24px) !important; font-weight: 700 !important; color: #ffffff !important; margin: 0 !important; white-space: nowrap; }
-.device-sub-badges span { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: #e3ebf5; }
-.dev-ic { width: 20px; height: 20px; border-radius: 50%; background: #ffffff; color: var(--mitra-primer); display: inline-flex; align-items: center; justify-content: center; font-size: 10px; }
-@media (max-width: 992px) { .filter-grid-3, .stats-grid { grid-template-columns: 1fr !important; } }
 </style>
 </head>
 <body>
@@ -269,7 +425,7 @@ $show_rev = $tema_mitra['show_revenue'] ?? 1;
             <div class="card-info">
                 <span class="card-label">Perangkat Aktif</span>
                 <div class="device-sub-badges">
-                    <span><i class="dev-ic"><i class="fa-solid fa-bars"></i></i> <?= $turnstile_aktif; ?> Turnstile</span>
+                    <span><i class="dev-ic"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M4.5 7.2 8.6 4.8 11 6.2V21H4.5z"/><g stroke="currentColor" stroke-width="1.7" stroke-linecap="round" fill="none"><line x1="12.6" y1="9.2" x2="21" y2="7.8"/><line x1="12.6" y1="10.6" x2="21" y2="11.6"/><line x1="12.6" y1="12.2" x2="18.6" y2="16.6"/><line x1="12.6" y1="13" x2="15.6" y2="19.4"/></g></svg></i> <?= $turnstile_aktif; ?> Turnstile</span>
                     <span><i class="dev-ic"><i class="fa-solid fa-video"></i></i> <?= $cctv_aktif; ?> CCTV</span>
                 </div>
             </div>
@@ -291,11 +447,6 @@ $show_rev = $tema_mitra['show_revenue'] ?? 1;
             <div class="chart-header">
                 <h3 class="chart-title">Traffic</h3>
                 <div class="chart-controls-right">
-                    <div class="shift-toggle-buttons" id="trafficShiftGroup">
-                        <button type="button" class="<?= ($default_shift === 'pagi') ? 'active' : ''; ?>" onclick="switchTrafficShift('pagi', this)">Pagi</button>
-                        <button type="button" class="<?= ($default_shift === 'siang') ? 'active' : ''; ?>" onclick="switchTrafficShift('siang', this)">Siang</button>
-                        <button type="button" class="<?= ($default_shift === 'malam') ? 'active' : ''; ?>" onclick="switchTrafficShift('malam', this)">Malam</button>
-                    </div>
                     <div class="toggle-buttons">
                         <button type="button" id="btnTrafficHarian" class="active" onclick="switchTraffic('harian')">Harian</button>
                         <button type="button" id="btnTrafficBulanan" onclick="switchTraffic('bulanan')">Bulanan</button>
@@ -310,11 +461,6 @@ $show_rev = $tema_mitra['show_revenue'] ?? 1;
             <div class="chart-header">
                 <h3 class="chart-title">Pendapatan</h3>
                 <div class="chart-controls-right">
-                    <div class="shift-toggle-buttons" id="omzetShiftGroup">
-                        <button type="button" class="<?= ($default_shift === 'pagi') ? 'active' : ''; ?>" onclick="switchOmzetShift('pagi', this)">Pagi</button>
-                        <button type="button" class="<?= ($default_shift === 'siang') ? 'active' : ''; ?>" onclick="switchOmzetShift('siang', this)">Siang</button>
-                        <button type="button" class="<?= ($default_shift === 'malam') ? 'active' : ''; ?>" onclick="switchOmzetShift('malam', this)">Malam</button>
-                    </div>
                     <div class="toggle-buttons">
                         <button type="button" id="btnOmzetHarian" class="active" onclick="switchOmzet('harian')">Harian</button>
                         <button type="button" id="btnOmzetBulanan" onclick="switchOmzet('bulanan')">Bulanan</button>
@@ -329,44 +475,71 @@ $show_rev = $tema_mitra['show_revenue'] ?? 1;
 </div>
 <script>
 function toggleDropdown(el) { el.parentElement.classList.toggle('active'); }
-const shiftDatasets = <?= json_encode($shift_data); ?>;
-let trafficMode = 'harian', omzetMode = 'harian';
-let trafficShift = '<?= $default_shift; ?>', omzetShift = '<?= $default_shift; ?>';
+
+// Data harian: sumbu X jam 00 - 23. Data bulanan: 6 bulan terakhir.
+const harianLabels = <?= json_encode($harian_labels); ?>;
+const harianTraffic = <?= json_encode($harian_traffic); ?>;
+const harianOmzet = <?= json_encode($harian_pendapatan); ?>;
 const bulananLabels = <?= json_encode($bulanan_labels); ?>;
 const bulananTraffic = <?= json_encode($bulanan_traffic); ?>;
 const bulananOmzet = <?= json_encode($bulanan_pendapatan); ?>;
 
 const COLOR_BAR = '<?= htmlspecialchars($tema_mitra['warna_aksen']); ?>';
+// Keterangan tooltip mode harian: jam "10" ditampilkan sebagai "10:00 - 10:59". Label bulanan tidak berubah.
+Chart.defaults.plugins.tooltip.callbacks.title = function (items) {
+    const lbl = items.length ? String(items[0].label) : '';
+    return /^\d{2}$/.test(lbl) ? lbl + ':00 - ' + lbl + ':59' : lbl;
+};
+const chartScales = {
+    x: { grid: { display: false }, ticks: { autoSkip: false, maxRotation: 0, font: { size: 11 } } },
+    y: { beginAtZero: true, ticks: { precision: 0 } }
+};
+
+// Warna lebih tua (sekitar 25% lebih gelap) untuk batang tertinggi. Jika warna bukan hex, dipakai warna aslinya.
+function darkenColor(hex, factor) {
+    const m = /^#?([0-9a-f]{6})$/i.exec(String(hex).trim());
+    if (!m) return hex;
+    const n = parseInt(m[1], 16);
+    const r = Math.round(((n >> 16) & 255) * factor);
+    const g = Math.round(((n >> 8) & 255) * factor);
+    const b = Math.round((n & 255) * factor);
+    return '#' + [r, g, b].map(v => v.toString(16).padStart(2, '0')).join('');
+}
+const COLOR_BAR_DARK = darkenColor(COLOR_BAR, 0.75);
+
 const trafficChart = new Chart(document.getElementById('trafficChart').getContext('2d'), {
     type: 'bar',
-    data: { labels: shiftDatasets[trafficShift].labels, datasets: [{ label: 'Pengunjung', data: shiftDatasets[trafficShift].traffic, backgroundColor: COLOR_BAR, borderRadius: 6 }] },
-    options: { responsive: true, maintainAspectRatio: false }
+    data: { labels: harianLabels, datasets: [{ label: 'Pengunjung', data: harianTraffic, backgroundColor: function (ctx) {
+        const data = ctx.dataset.data;
+        const max = Math.max.apply(null, data);
+        return (max > 0 && data[ctx.dataIndex] === max) ? COLOR_BAR_DARK : COLOR_BAR;
+    }, borderRadius: 6 }] },
+    options: { responsive: true, maintainAspectRatio: false, scales: chartScales }
 });
 <?php if ($show_rev === 1): ?>
 const pendapatanChart = new Chart(document.getElementById('pendapatanChart').getContext('2d'), {
     type: 'line',
-    data: { labels: shiftDatasets[omzetShift].labels, datasets: [{ label: 'Pendapatan', data: shiftDatasets[omzetShift].pendapatan, borderColor: COLOR_BAR, backgroundColor: 'rgba(234,179,8,0.2)', fill: true }] },
-    options: { responsive: true, maintainAspectRatio: false }
+    data: { labels: harianLabels, datasets: [{ label: 'Pendapatan', data: harianOmzet, borderColor: COLOR_BAR, backgroundColor: 'rgba(234,179,8,0.2)', fill: true, tension: 0.3 }] },
+    options: { responsive: true, maintainAspectRatio: false, scales: chartScales }
 });
 <?php endif; ?>
 
 function switchTraffic(mode) {
-    trafficMode = mode;
     document.getElementById('btnTrafficHarian').classList.toggle('active', mode === 'harian');
     document.getElementById('btnTrafficBulanan').classList.toggle('active', mode === 'bulanan');
-    trafficChart.data.labels = (mode === 'harian') ? shiftDatasets[trafficShift].labels : bulananLabels;
-    trafficChart.data.datasets[0].data = (mode === 'harian') ? shiftDatasets[trafficShift].traffic : bulananTraffic;
-    document.getElementById('trafficShiftGroup').style.display = (mode === 'harian') ? 'inline-flex' : 'none';
+    trafficChart.data.labels = (mode === 'harian') ? harianLabels : bulananLabels;
+    trafficChart.data.datasets[0].data = (mode === 'harian') ? harianTraffic : bulananTraffic;
     trafficChart.update();
 }
-function switchTrafficShift(shift, btn) {
-    trafficShift = shift;
-    btn.parentElement.querySelectorAll('button').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    trafficChart.data.labels = shiftDatasets[trafficShift].labels;
-    trafficChart.data.datasets[0].data = shiftDatasets[trafficShift].traffic;
-    trafficChart.update();
+<?php if ($show_rev === 1): ?>
+function switchOmzet(mode) {
+    document.getElementById('btnOmzetHarian').classList.toggle('active', mode === 'harian');
+    document.getElementById('btnOmzetBulanan').classList.toggle('active', mode === 'bulanan');
+    pendapatanChart.data.labels = (mode === 'harian') ? harianLabels : bulananLabels;
+    pendapatanChart.data.datasets[0].data = (mode === 'harian') ? harianOmzet : bulananOmzet;
+    pendapatanChart.update();
 }
+<?php endif; ?>
 </script>
 </body>
 </html>
