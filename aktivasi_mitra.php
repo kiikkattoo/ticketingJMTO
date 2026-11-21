@@ -25,6 +25,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $user_data) {
 
     if (strlen($pass1) < 6) {
         $error = "Password minimal harus 6 karakter.";
+    } elseif (strlen($pass1) > 12) {
+        $error = "Password maksimal 12 karakter.";
     } elseif ($pass1 !== $pass2) {
         $error = "Konfirmasi password tidak cocok dengan password baru.";
     } else {
@@ -41,7 +43,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $user_data) {
 
         if ($update) {
             // Ambil id_mitra yang terhubung
-            $id_mitra_user = $user_data['id_mitra'];
+            $id_mitra_user = mysqli_real_escape_string($conn, $user_data['id_mitra']);
 
             // 2. Sinkronkan status di tabel mitra menggunakan kode_mitra
             mysqli_query($conn, "UPDATE mitra SET status_mitra = 'Aktif' WHERE kode_mitra = '$id_mitra_user'");
@@ -184,11 +186,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $user_data) {
         <form method="POST">
             <div class="form-group">
                 <label>Password Baru</label>
-                <input type="password" name="password" placeholder="Minimal 6 karakter" required>
+                <input type="password" name="password" placeholder="6-12 karakter" minlength="6" maxlength="12" required>
             </div>
             <div class="form-group">
                 <label>Konfirmasi Password Baru</label>
-                <input type="password" name="confirm_password" placeholder="Ulangi password baru" required>
+                <input type="password" name="confirm_password" placeholder="Ulangi password baru" minlength="6" maxlength="12" required>
             </div>
             <button type="submit">Setujui & Aktifkan Akun</button>
         </form>
