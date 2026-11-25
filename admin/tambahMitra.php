@@ -2,6 +2,25 @@
 session_start();
 require_once '../koneksi.php';
 
+// ===== FUNGSI VALIDASI NPWP & NIB =====
+function nomorAsal($digits) {
+    // semua angka sama (000000..., 111111...) atau urutan (123456789..., 987654321...)
+    if (preg_match('/^(\d)\1+$/', $digits)) return true;
+    if (strpos('01234567890123456789', $digits) !== false) return true;
+    if (strpos('98765432109876543210', $digits) !== false) return true;
+    return false;
+}
+
+function validNPWP($npwp) {
+    $d = preg_replace('/\D/', '', $npwp);
+    return in_array(strlen($d), [15, 16]) && !nomorAsal($d);
+}
+
+function validNIB($nib) {
+    $d = preg_replace('/\D/', '', $nib);
+    return strlen($d) === 13 && !nomorAsal($d);
+}
+
 // Proteksi Halaman
 if (!isset($_SESSION["loggedin"]) || $_SESSION["loggedin"] !== true) {
     header("Location: ../login.php");
@@ -44,6 +63,10 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         $error_msg = "Nama Mitra wajib diisi!";
     } elseif (empty($email_tujuan)) {
         $error_msg = "Email Mitra atau Email PIC wajib diisi untuk pengiriman undangan aktivasi!";
+    } elseif (!empty($npwp) && !validNPWP($npwp)) {
+        $error_msg = "Nomor NPWP tidak valid. Masukkan NPWP dengan benar (15 atau 16 digit).";
+    } elseif (!empty($nib) && !validNIB($nib)) {
+        $error_msg = "Nomor NIB / Izin Usaha tidak valid. Masukkan NIB dengan benar (13 digit).";
     } else {
         // 1. Cek apakah email sudah terdaftar di tabel users
         $cek_email = mysqli_query($conn, "SELECT email FROM users WHERE email = '$email_tujuan' LIMIT 1");
@@ -155,6 +178,15 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 <link rel="stylesheet" href="../style.css?v=<?php echo time(); ?>">
 <link href="https://fonts.googleapis.com/css?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<style>
+.file-name-text { font-size: 13px; color: #555; }
+.file-name-text.success { color: #16a34a; }
+.field-hint { display: block; margin-top: 6px; font-size: 12px; color: #888; }
+.field-hint.error { color: #dc2626; }
+.field-hint.ok { color: #16a34a; }
+input.invalid { border-color: #dc2626 !important; }
+input.valid { border-color: #16a34a !important; }
+</style>
 </head>
 <body>
 <div class="dashboard-wrapper">
@@ -265,9 +297,10 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 </div>
 <div class="form-group-custom">
 <label for="logo">Logo</label>
-<div class="file-upload-box">
+<div class="file-upload-box" style="display:flex; align-items:center; gap:12px;">
 <input type="file" id="logo" name="logo" class="file-input" accept="image/*">
 <button type="button" class="btn-upload-fake" onclick="document.getElementById('logo').click()">Pilih Gambar</button>
+<span id="logo_name" class="file-name-text"></span>
 </div>
 </div>
 </section>
@@ -298,11 +331,13 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 <h3 class="form-section-title">Data Legal</h3>
 <div class="form-group-custom">
 <label for="npwp">NPWP</label>
-<input type="text" id="npwp" name="npwp" placeholder="Masukkan NPWP" autocomplete="off">
+<input type="text" id="npwp" name="npwp" placeholder="Masukkan NPWP" autocomplete="off" inputmode="numeric" maxlength="20">
+<small class="field-hint" id="npwp_hint">Masukkan nomor NPWP dengan benar (15 atau 16 digit).</small>
 </div>
 <div class="form-group-custom">
 <label for="nib">NIB / Izin Usaha</label>
-<input type="text" id="nib" name="nib" placeholder="Masukkan NIB / Izin Usaha" autocomplete="off">
+<input type="text" id="nib" name="nib" placeholder="Masukkan NIB / Izin Usaha" autocomplete="off" inputmode="numeric" maxlength="13">
+<small class="field-hint" id="nib_hint">Masukkan nomor izin usaha (NIB) dengan benar (13 digit).</small>
 </div>
 </section>
 
@@ -318,6 +353,70 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 function toggleDropdown(element) {
     element.parentElement.classList.toggle('active');
 }
+
+// Tampilkan nama file logo setelah dipilih
+document.getElementById('logo').addEventListener('change', function () {
+    const label = document.getElementById('logo_name');
+    if (this.files.length > 0) {
+        label.textContent = '✓ ' + this.files[0].name;
+        label.classList.add('success');
+    } else {
+        label.textContent = '';
+        label.classList.remove('success');
+    }
+});
+
+// Deteksi nomor asal-asalan (angka sama semua / berurutan)
+function nomorAsal(d) {
+    if (/^(\d)\1+$/.test(d)) return true;
+    if ('01234567890123456789'.includes(d)) return true;
+    if ('98765432109876543210'.includes(d)) return true;
+    return false;
+}
+
+function setupValidasi(inputId, hintId, panjangValid, bolehPemisah, pesanKosong, pesanSalah, pesanBenar) {
+    const input = document.getElementById(inputId);
+    const hint  = document.getElementById(hintId);
+
+    input.addEventListener('input', function () {
+        // NPWP boleh titik & strip, NIB hanya angka
+        this.value = this.value.replace(bolehPemisah ? /[^0-9.\-]/g : /[^0-9]/g, '');
+        const d = this.value.replace(/\D/g, '');
+
+        this.classList.remove('valid', 'invalid');
+        hint.classList.remove('error', 'ok');
+
+        if (d.length === 0) {
+            hint.textContent = pesanKosong;
+        } else if (!panjangValid.includes(d.length) || nomorAsal(d)) {
+            hint.textContent = pesanSalah;
+            hint.classList.add('error');
+            this.classList.add('invalid');
+        } else {
+            hint.textContent = pesanBenar;
+            hint.classList.add('ok');
+            this.classList.add('valid');
+        }
+    });
+}
+
+setupValidasi('npwp', 'npwp_hint', [15, 16], true,
+    'Masukkan nomor NPWP dengan benar (15 atau 16 digit).',
+    'Nomor NPWP belum benar. Masukkan 15 atau 16 digit angka yang valid.',
+    'Format NPWP sesuai.');
+
+setupValidasi('nib', 'nib_hint', [13], false,
+    'Masukkan nomor izin usaha (NIB) dengan benar (13 digit).',
+    'Nomor NIB belum benar. Masukkan 13 digit angka yang valid.',
+    'Format NIB sesuai.');
+
+// Cegah submit kalau NPWP/NIB masih salah
+document.querySelector('form').addEventListener('submit', function (e) {
+    if (document.querySelector('input.invalid')) {
+        e.preventDefault();
+        alert('Masukkan nomor NPWP dan izin usaha dengan benar.');
+    }
+});
 </script>
 </body>
 </html>
